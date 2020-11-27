@@ -59,6 +59,10 @@ All notable changes to "Azure Toolkit for IntelliJ IDEA" will be documented in t
   - [3.0.7](#307)
   - [3.0.6](#306)
 
+## 3.45.1
+### Fixed
+- [#4765](https://github.com/microsoft/azure-tools-for-java/pull/4765) Fixes no before run tasks when deploy Spring Cloud app in project menu
+
 ## 3.45.0
 ### Added
 - Add file explorer for Web App and Function App in Azure explorer
