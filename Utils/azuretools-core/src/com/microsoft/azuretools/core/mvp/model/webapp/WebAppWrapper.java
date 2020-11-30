@@ -23,6 +23,8 @@
 package com.microsoft.azuretools.core.mvp.model.webapp;
 
 import com.microsoft.azure.management.apigeneration.Beta;
+import com.microsoft.azure.management.appservice.DeployOptions;
+import com.microsoft.azure.management.appservice.DeployType;
 import com.microsoft.azure.management.appservice.DeploymentSlots;
 import com.microsoft.azure.management.appservice.SupportedTlsVersions;
 import com.microsoft.azure.management.appservice.WebApp;
@@ -33,6 +35,7 @@ import rx.Observable;
 
 import java.io.File;
 import java.io.InputStream;
+import java.util.Map;
 
 public class WebAppWrapper extends WebAppBaseWrapper implements WebApp {
 
@@ -101,6 +104,16 @@ public class WebAppWrapper extends WebAppBaseWrapper implements WebApp {
     }
 
     @Override
+    public Map<String, String> getSiteAppSettings() {
+        return getWebApp().getSiteAppSettings();
+    }
+
+    @Override
+    public Observable<Map<String, String>> getSiteAppSettingsAsync() {
+        return getWebApp().getSiteAppSettingsAsync();
+    }
+
+    @Override
     public WebApp refresh() {
         return this.getWebApp().refresh();
     }
@@ -126,5 +139,45 @@ public class WebAppWrapper extends WebAppBaseWrapper implements WebApp {
             this.webapp = instance.getWebAppById(getSubscriptionId(), inner().id());
         }
         return this.webapp;
+    }
+
+    @Override
+    public void deploy(DeployType deployType, File file) {
+        getWebApp().deploy(deployType, file);
+    }
+
+    @Override
+    public Completable deployAsync(DeployType deployType, File file) {
+        return getWebApp().deployAsync(deployType, file);
+    }
+
+    @Override
+    public void deploy(DeployType deployType, File file, DeployOptions deployOptions) {
+        getWebApp().deploy(deployType, file, deployOptions);
+    }
+
+    @Override
+    public Completable deployAsync(DeployType deployType, File file, DeployOptions deployOptions) {
+        return getWebApp().deployAsync(deployType, file, deployOptions);
+    }
+
+    @Override
+    public void deploy(DeployType deployType, InputStream inputStream) {
+        getWebApp().deploy(deployType, inputStream);
+    }
+
+    @Override
+    public Completable deployAsync(DeployType deployType, InputStream inputStream) {
+        return getWebApp().deployAsync(deployType, inputStream);
+    }
+
+    @Override
+    public void deploy(DeployType deployType, InputStream inputStream, DeployOptions deployOptions) {
+        getWebApp().deploy(deployType, inputStream, deployOptions);
+    }
+
+    @Override
+    public Completable deployAsync(DeployType deployType, InputStream inputStream, DeployOptions deployOptions) {
+        return getWebApp().deployAsync(deployType, inputStream, deployOptions);
     }
 }

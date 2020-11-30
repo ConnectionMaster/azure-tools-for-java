@@ -128,6 +128,16 @@ public class FunctionAppWrapper extends WebAppBaseWrapper implements FunctionApp
     }
 
     @Override
+    public Map<String, String> getSiteAppSettings() {
+        return getFunctionApp().getSiteAppSettings();
+    }
+
+    @Override
+    public Observable<Map<String, String>> getSiteAppSettingsAsync() {
+        return getFunctionApp().getSiteAppSettingsAsync();
+    }
+
+    @Override
     protected WebAppBase getWebAppBase() {
         return getFunctionApp();
     }
