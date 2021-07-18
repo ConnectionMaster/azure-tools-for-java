@@ -1,23 +1,6 @@
 /*
- * Copyright (c) Microsoft Corporation
- *
- * All rights reserved.
- *
- * MIT License
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
- * documentation files (the "Software"), to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and
- * to permit persons to whom the Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all copies or substantial portions of
- * the Software.
- *
- * THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
- * THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Licensed under the MIT License. See License.txt in the project root for license information.
  */
 
 package com.microsoft.intellij.actions;
@@ -28,10 +11,14 @@ import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.DialogWrapper;
 import com.intellij.openapi.wm.WindowManager;
+import com.microsoft.azure.toolkit.lib.Azure;
+import com.microsoft.azure.toolkit.lib.auth.AzureAccount;
+import com.microsoft.azure.toolkit.lib.auth.exception.AzureToolkitAuthenticationException;
+import com.microsoft.azure.toolkit.lib.auth.model.AuthType;
 import com.microsoft.azure.toolkit.lib.common.operation.AzureOperation;
-import com.microsoft.azuretools.authmanage.AuthMethod;
 import com.microsoft.azuretools.authmanage.AuthMethodManager;
 import com.microsoft.azuretools.authmanage.models.AuthMethodDetails;
+import com.microsoft.intellij.helpers.AzureIconLoader;
 import com.microsoft.intellij.ui.SignInWindow;
 import com.microsoft.intellij.AzureAnAction;
 import com.microsoft.azuretools.telemetry.TelemetryConstants;
@@ -40,13 +27,14 @@ import com.microsoft.azuretools.telemetrywrapper.Operation;
 import com.microsoft.intellij.helpers.UIHelperImpl;
 import com.microsoft.intellij.serviceexplorer.azure.SignInOutAction;
 import com.microsoft.tooling.msservices.components.DefaultLoader;
+import com.microsoft.tooling.msservices.serviceexplorer.AzureIconSymbol;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import rx.Single;
+import rx.exceptions.Exceptions;
 
 import javax.swing.*;
 
-import static com.microsoft.azuretools.authmanage.AuthMethod.AZ;
 import static com.microsoft.azuretools.telemetry.TelemetryConstants.ACCOUNT;
 import static com.microsoft.azuretools.telemetry.TelemetryConstants.SIGNOUT;
 
@@ -100,17 +88,20 @@ public class AzureSignInAction extends AzureAnAction {
 
     private static String getSignOutWarningMessage(@NotNull AuthMethodManager authMethodManager) {
         final AuthMethodDetails authMethodDetails = authMethodManager.getAuthMethodDetails();
-        final AuthMethod authMethod = authMethodManager.getAuthMethod();
+        if (authMethodDetails == null || authMethodDetails.getAuthType() == null) {
+            return String.format("Do you really want to sign out?");
+        }
+        final AuthType authType = authMethodDetails.getAuthType();
         final String warningMessage;
-        switch (authMethod) {
-            case SP:
-                warningMessage = String.format("Signed in using file \"%s\"", authMethodDetails.getCredFilePath());
+        switch (authType) {
+            case SERVICE_PRINCIPAL:
+                warningMessage = String.format("Signed in using service principal \"%s\"", authMethodDetails.getClientId());
                 break;
-            case AD:
-            case DC:
-                warningMessage = String.format("Signed in as %s", authMethodDetails.getAccountEmail());
+            case OAUTH2:
+            case DEVICE_CODE:
+                warningMessage = String.format("Signed in as %s(%s)", authMethodDetails.getAccountEmail(), authType.toString());
                 break;
-            case AZ:
+            case AZURE_CLI:
                 warningMessage = "Signed in with Azure CLI";
                 break;
             default:
@@ -118,7 +109,7 @@ public class AzureSignInAction extends AzureAnAction {
                 break;
         }
         return String.format("%s\nDo you really want to sign out? %s",
-                             warningMessage, authMethod == AZ ? "(This will not sign you out from Azure CLI)" : "");
+                warningMessage, authType == AuthType.AZURE_CLI ? "(This will not sign you out from Azure CLI)" : "");
     }
 
     public static void onAzureSignIn(Project project) {
@@ -126,21 +117,28 @@ public class AzureSignInAction extends AzureAnAction {
         AuthMethodManager authMethodManager = AuthMethodManager.getInstance();
         boolean isSignIn = authMethodManager.isSignedIn();
         if (isSignIn) {
-            boolean res = DefaultLoader.getUIHelper().showYesNoDialog(frame.getRootPane(),
-                                                                      getSignOutWarningMessage(authMethodManager),
-                                                                      "Azure Sign Out",
-                                                                      new ImageIcon("icons/azure.png"));
+            boolean res = DefaultLoader.getUIHelper().showYesNoDialog(frame.getRootPane(), getSignOutWarningMessage(authMethodManager),
+                    "Azure Sign Out", AzureIconLoader.loadIcon(AzureIconSymbol.Common.AZURE));
             if (res) {
                 EventUtil.executeWithLog(ACCOUNT, SIGNOUT, (operation) -> {
                     authMethodManager.signOut();
                 });
             }
         } else {
-            doSignIn(authMethodManager, project).subscribe();
+            doSignIn(authMethodManager, project).subscribe(r -> {
+                if (r) {
+                    AzureAccount az = Azure.az(AzureAccount.class);
+                    authMethodManager.getAzureManager().getSelectedSubscriptions().stream().limit(5).forEach(s -> {
+                        // pre-load regions;
+                        az.listRegions(s.getId());
+                    });
+                }
+
+            });
         }
     }
 
-    @AzureOperation(value = "sign in to Azure", type = AzureOperation.Type.SERVICE)
+    @AzureOperation(name = "account.sign_in", type = AzureOperation.Type.SERVICE)
     public static Single<Boolean> doSignIn(AuthMethodManager authMethodManager, Project project) {
         final boolean isSignIn = authMethodManager.isSignedIn();
         if (isSignIn) {
@@ -154,7 +152,14 @@ public class AzureSignInAction extends AzureAnAction {
                 .doOnSuccess(authMethodManager::setAuthMethodDetails)
                 .flatMap((a) -> SelectSubscriptionsAction.selectSubscriptions(project))
                 .doOnSuccess((subs) -> authMethodManager.notifySignInEventListener())
-                .map((unused) -> authMethodManager.isSignedIn());
+                .map((unused) -> authMethodManager.isSignedIn())
+                    .onErrorResumeNext(ex -> {
+                        Throwable e = Exceptions.getFinalCause(ex);
+                        if (e instanceof IllegalStateException && "user cancel".equals(e.getMessage())) {
+                            return Single.just(false);
+                        }
+                        throw new AzureToolkitAuthenticationException("Cannot login due to error", e);
+                    });
         } else {
             return Single.fromCallable(authMethodManager::isSignedIn);
         }

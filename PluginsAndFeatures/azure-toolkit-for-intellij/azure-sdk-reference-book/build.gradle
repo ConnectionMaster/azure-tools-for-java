@@ -1,0 +1,18 @@
+apply plugin: "io.freefair.aspectj.post-compile-weaving"
+
+intellij {
+    plugins = ['java', 'maven', 'gradle']
+}
+
+dependencies {
+    implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-csv:2.12.3', {
+        exclude group: "com.fasterxml.jackson", module: "jackson-bom"
+    }
+    implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.12.3', {
+        exclude group: "com.fasterxml.jackson", module: "jackson-bom"
+    }
+    compile project(':azure-intellij-plugin-lib')
+    compile "com.microsoft.azure:azure-toolkit-common-lib:0.10.0-SNAPSHOT"
+
+    aspect "com.microsoft.azure:azure-toolkit-common-lib:0.10.0-SNAPSHOT"
+}

@@ -67,7 +67,7 @@
           <text value="Server name:"/>
         </properties>
       </component>
-      <component id="a5dd0" class="com.microsoft.azure.toolkit.intellij.mysql.ServerNameTextField" binding="serverNameTextField">
+      <component id="a5dd0" class="com.microsoft.azure.toolkit.intellij.database.ServerNameTextField" binding="serverNameTextField">
         <constraints>
           <grid row="4" column="1" row-span="1" col-span="1" vsize-policy="0" hsize-policy="6" anchor="8" fill="1" indent="1" use-parent-layout="false">
             <preferred-size width="150" height="-1"/>
@@ -83,7 +83,7 @@
           <text value="Location:"/>
         </properties>
       </component>
-      <component id="400c" class="com.microsoft.azure.toolkit.intellij.mysql.MySQLRegionComboBox" binding="regionComboBox">
+      <component id="400c" class="com.microsoft.azure.toolkit.intellij.database.RegionComboBox" binding="regionComboBox">
         <constraints>
           <grid row="5" column="1" row-span="1" col-span="1" vsize-policy="0" hsize-policy="2" anchor="8" fill="1" indent="1" use-parent-layout="false"/>
         </constraints>
@@ -119,7 +119,7 @@
           <text value="Admin username:"/>
         </properties>
       </component>
-      <component id="6ff8e" class="com.microsoft.azure.toolkit.intellij.mysql.AdminUsernameTextField" binding="adminUsernameTextField">
+      <component id="6ff8e" class="com.microsoft.azure.toolkit.intellij.database.AdminUsernameTextField" binding="adminUsernameTextField">
         <constraints>
           <grid row="8" column="1" row-span="1" col-span="1" vsize-policy="0" hsize-policy="6" anchor="8" fill="1" indent="1" use-parent-layout="false">
             <preferred-size width="150" height="-1"/>
@@ -167,7 +167,7 @@
           <text value="Connection security"/>
         </properties>
       </component>
-      <nested-form id="8f448" form-file="com/microsoft/azure/toolkit/intellij/mysql/ConnectionSecurityPanel.form" binding="security">
+      <nested-form id="8f448" form-file="com/microsoft/azure/toolkit/intellij/database/ui/ConnectionSecurityPanel.form" binding="security">
         <constraints>
           <grid row="12" column="0" row-span="1" col-span="2" vsize-policy="3" hsize-policy="3" anchor="0" fill="1" indent="1" use-parent-layout="false"/>
         </constraints>

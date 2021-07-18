@@ -1,51 +1,33 @@
 /*
- * Copyright (c) Microsoft Corporation
- *
- * All rights reserved.
- *
- * MIT License
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
- * documentation files (the "Software"), to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and
- * to permit persons to whom the Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all copies or substantial portions of
- * the Software.
- *
- * THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
- * THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Licensed under the MIT License. See License.txt in the project root for license information.
  */
 
 package com.microsoft.azure.toolkit.intellij.webapp.docker.webapponlinux.ui;
 
+import com.intellij.ui.SimpleListCellRenderer;
 import com.microsoft.azure.toolkit.intellij.webapp.docker.ContainerSettingPanel;
 import com.microsoft.azure.toolkit.intellij.common.AzureSettingPanel;
 import com.microsoft.azure.toolkit.intellij.webapp.docker.utils.Constant;
+import com.microsoft.azure.toolkit.lib.appservice.service.IAppServicePlan;
+import com.microsoft.azure.toolkit.lib.appservice.service.IWebApp;
+import com.microsoft.azure.toolkit.lib.appservice.service.impl.AppServicePlan;
+import com.microsoft.azure.toolkit.lib.common.model.Region;
+import com.microsoft.azure.toolkit.lib.common.model.ResourceGroup;
+import com.microsoft.azure.toolkit.lib.common.model.Subscription;
 import icons.MavenIcons;
 
 import com.intellij.icons.AllIcons;
 import com.intellij.openapi.actionSystem.ActionToolbarPosition;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.util.Comparing;
 import com.intellij.packaging.artifacts.Artifact;
 import com.intellij.ui.AnActionButton;
 import com.intellij.ui.HideableDecorator;
-import com.intellij.ui.ListCellRendererWrapper;
 import com.intellij.ui.ToolbarDecorator;
 import com.intellij.ui.table.JBTable;
-import com.microsoft.azure.management.appservice.AppServicePlan;
-import com.microsoft.azure.management.appservice.PricingTier;
-import com.microsoft.azure.management.appservice.WebApp;
-import com.microsoft.azure.management.resources.Location;
-import com.microsoft.azure.management.resources.ResourceGroup;
-import com.microsoft.azure.management.resources.Subscription;
+import com.microsoft.azure.toolkit.lib.appservice.model.PricingTier;
 import com.microsoft.azuretools.azurecommons.util.Utils;
-import com.microsoft.azuretools.core.mvp.model.ResourceEx;
 import com.microsoft.azuretools.core.mvp.model.webapp.PrivateRegistryImageSetting;
 import com.microsoft.azure.toolkit.intellij.webapp.docker.utils.DockerUtil;
 import com.microsoft.azure.toolkit.intellij.webapp.docker.webapponlinux.WebAppOnLinuxDeployConfiguration;
@@ -97,7 +79,7 @@ public class SettingPanel extends AzureSettingPanel<WebAppOnLinuxDeployConfigura
     private JRadioButton rdoUseExist;
     private JRadioButton rdoCreateNew;
     private JPanel pnlCreate;
-    private JComboBox<Location> cbLocation;
+    private JComboBox<Region> cbLocation;
     private JComboBox<PricingTier> cbPricing;
     private JRadioButton rdoCreateResGrp;
     private JTextField txtNewResGrp;
@@ -105,14 +87,14 @@ public class SettingPanel extends AzureSettingPanel<WebAppOnLinuxDeployConfigura
     private JRadioButton rdoCreateAppServicePlan;
     private JTextField txtCreateAppServicePlan;
     private JRadioButton rdoUseExistAppServicePlan;
-    private JComboBox<AppServicePlan> cbExistAppServicePlan;
+    private JComboBox<IAppServicePlan> cbExistAppServicePlan;
     private JLabel lblLocation;
     private JLabel lblPricing;
     private JPanel pnlAcr;
     private JPanel pnlWebApp;
     private JBTable webAppTable;
     private AnActionButton btnRefresh;
-    private List<ResourceEx<WebApp>> cachedWebAppList;
+    private List<IWebApp> cachedWebAppList;
     private String defaultWebAppId;
     private String defaultLocationName;
     private String defaultPricingTier;
@@ -150,12 +132,12 @@ public class SettingPanel extends AzureSettingPanel<WebAppOnLinuxDeployConfigura
         rdoUseExist.addActionListener(e -> updatePanelVisibility());
 
         // resource group
-        comboResourceGroup.setRenderer(new ListCellRendererWrapper<ResourceGroup>() {
+        comboResourceGroup.setRenderer(new SimpleListCellRenderer<>() {
             @Override
             public void customize(JList jlist, ResourceGroup resourceGroup, int index, boolean isSelected, boolean
                     cellHasFocus) {
                 if (resourceGroup != null) {
-                    setText(resourceGroup.name());
+                    setText(resourceGroup.getName());
                 }
             }
         });
@@ -165,12 +147,12 @@ public class SettingPanel extends AzureSettingPanel<WebAppOnLinuxDeployConfigura
         rdoUseExistResGrp.addActionListener(e -> updateResourceGroupEnabled());
 
         // subscription combo
-        comboSubscription.setRenderer(new ListCellRendererWrapper<Subscription>() {
+        comboSubscription.setRenderer(new SimpleListCellRenderer<>() {
             @Override
             public void customize(JList jlist, Subscription subscription, int index, boolean isSelected, boolean
                     cellHasFocus) {
                 if (subscription != null) {
-                    setText(String.format("%s (%s)", subscription.displayName(), subscription.subscriptionId()));
+                    setText(String.format("%s (%s)", subscription.getName(), subscription.getId()));
                 }
             }
         });
@@ -178,9 +160,9 @@ public class SettingPanel extends AzureSettingPanel<WebAppOnLinuxDeployConfigura
         comboSubscription.addItemListener(this::onComboSubscriptionSelection);
 
         // app service plan
-        cbExistAppServicePlan.setRenderer(new ListCellRendererWrapper<AppServicePlan>() {
+        cbExistAppServicePlan.setRenderer(new SimpleListCellRenderer<>() {
             @Override
-            public void customize(JList jlist, AppServicePlan asp, int index, boolean isSelected, boolean
+            public void customize(JList jlist, IAppServicePlan asp, int index, boolean isSelected, boolean
                     cellHasFocus) {
                 if (asp != null) {
                     setText(asp.name());
@@ -193,17 +175,17 @@ public class SettingPanel extends AzureSettingPanel<WebAppOnLinuxDeployConfigura
         rdoUseExistAppServicePlan.addActionListener(e -> updateAppServicePlanEnabled());
 
         // location combo
-        cbLocation.setRenderer(new ListCellRendererWrapper<Location>() {
+        cbLocation.setRenderer(new SimpleListCellRenderer<>() {
             @Override
-            public void customize(JList jlist, Location location, int index, boolean isSelected, boolean cellHasFocus) {
+            public void customize(JList jlist, Region location, int index, boolean isSelected, boolean cellHasFocus) {
                 if (location != null) {
-                    setText(location.displayName());
+                    setText(location.getName());
                 }
             }
         });
 
         // pricing tier combo
-        cbPricing.setRenderer(new ListCellRendererWrapper<PricingTier>() {
+        cbPricing.setRenderer(new SimpleListCellRenderer<>() {
             @Override
             public void customize(JList jlist, PricingTier pricingTier, int index, boolean isSelected, boolean
                     cellHasFocus) {
@@ -213,11 +195,9 @@ public class SettingPanel extends AzureSettingPanel<WebAppOnLinuxDeployConfigura
             }
         });
 
-        cbArtifact.addActionListener(e -> {
-            artifactActionPerformed((Artifact) cbArtifact.getSelectedItem());
-        });
+        cbArtifact.addActionListener(e -> artifactActionPerformed((Artifact) cbArtifact.getSelectedItem()));
 
-        cbArtifact.setRenderer(new ListCellRendererWrapper<Artifact>() {
+        cbArtifact.setRenderer(new SimpleListCellRenderer<>() {
             @Override
             public void customize(JList jlist, Artifact artifact, int i, boolean b, boolean b1) {
                 if (artifact != null) {
@@ -228,7 +208,7 @@ public class SettingPanel extends AzureSettingPanel<WebAppOnLinuxDeployConfigura
         });
 
         cbMavenProject.addActionListener(e -> {
-            MavenProject selectedMavenProject = (MavenProject) cbMavenProject.getSelectedItem();
+            final MavenProject selectedMavenProject = (MavenProject) cbMavenProject.getSelectedItem();
             if (selectedMavenProject != null) {
                 containerSettingPanel.setDockerPath(
                         DockerUtil.getDefaultDockerFilePathIfExist(selectedMavenProject.getDirectory())
@@ -236,7 +216,7 @@ public class SettingPanel extends AzureSettingPanel<WebAppOnLinuxDeployConfigura
             }
         });
 
-        cbMavenProject.setRenderer(new ListCellRendererWrapper<MavenProject>() {
+        cbMavenProject.setRenderer(new SimpleListCellRenderer<>() {
             @Override
             public void customize(JList list, MavenProject mavenProject, int i, boolean b, boolean b1) {
                 if (mavenProject != null) {
@@ -247,22 +227,22 @@ public class SettingPanel extends AzureSettingPanel<WebAppOnLinuxDeployConfigura
         });
 
         // fold sub panel
-        HideableDecorator resGrpDecorator = new HideableDecorator(pnlResourceGroupHolder,
+        final HideableDecorator resGrpDecorator = new HideableDecorator(pnlResourceGroupHolder,
                 TITLE_RESOURCE_GROUP, true /*adjustWindow*/);
         resGrpDecorator.setContentComponent(pnlResourceGroup);
         resGrpDecorator.setOn(true);
 
-        HideableDecorator appServicePlanDecorator = new HideableDecorator(pnlAppServicePlanHolder,
+        final HideableDecorator appServicePlanDecorator = new HideableDecorator(pnlAppServicePlanHolder,
                 TITLE_APP_SERVICE_PLAN, true /*adjustWindow*/);
         appServicePlanDecorator.setContentComponent(pnlAppServicePlan);
         appServicePlanDecorator.setOn(true);
 
-        HideableDecorator acrDecorator = new HideableDecorator(pnlAcrHolder,
+        final HideableDecorator acrDecorator = new HideableDecorator(pnlAcrHolder,
                 TITLE_ACR, true /*adjustWindow*/);
         acrDecorator.setContentComponent(pnlAcr);
         acrDecorator.setOn(true);
 
-        HideableDecorator webAppDecorator = new HideableDecorator(pnlWebAppHolder,
+        final HideableDecorator webAppDecorator = new HideableDecorator(pnlWebAppHolder,
                 TITLE_WEB_APP, true /*adjustWindow*/);
         webAppDecorator.setContentComponent(pnlWebApp);
         webAppDecorator.setOn(true);
@@ -312,20 +292,21 @@ public class SettingPanel extends AzureSettingPanel<WebAppOnLinuxDeployConfigura
             cbExistAppServicePlan.removeAllItems();
             lblLocation.setText("");
             lblPricing.setText("");
-            Subscription sub = (Subscription) comboSubscription.getSelectedItem();
-            ResourceGroup rg = (ResourceGroup) comboResourceGroup.getSelectedItem();
+            final Subscription sub = (Subscription) comboSubscription.getSelectedItem();
+            final ResourceGroup rg = (ResourceGroup) comboResourceGroup.getSelectedItem();
             if (sub != null && rg != null) {
-                updateAppServicePlanList(sub.subscriptionId(), rg.name());
+                updateAppServicePlanList(sub.getId(), rg.getName());
             }
         }
     }
 
     private void onComboExistingAspSelection(ItemEvent event) {
         if (event.getStateChange() == ItemEvent.SELECTED) {
-            AppServicePlan asp = (AppServicePlan) cbExistAppServicePlan.getSelectedItem();
+            final AppServicePlan asp = (AppServicePlan) cbExistAppServicePlan.getSelectedItem();
             if (asp != null) {
-                lblLocation.setText(asp.regionName());
-                lblPricing.setText(asp.pricingTier().toString());
+                lblLocation.setText(asp.entity().getRegion());
+                // TODO(andxu): change to toString
+                lblPricing.setText(asp.entity().getPricingTier().getSize());
             }
         }
     }
@@ -343,10 +324,10 @@ public class SettingPanel extends AzureSettingPanel<WebAppOnLinuxDeployConfigura
         }
         comboResourceGroup.removeAllItems();
         cbLocation.removeAllItems();
-        Subscription sb = (Subscription) comboSubscription.getSelectedItem();
+        final Subscription sb = (Subscription) comboSubscription.getSelectedItem();
         if (sb != null) {
-            updateResourceGroupList(sb.subscriptionId());
-            updateLocationList(sb.subscriptionId());
+            updateResourceGroupList(sb.getId());
+            updateLocationList(sb.getId());
         }
     }
 
@@ -360,14 +341,14 @@ public class SettingPanel extends AzureSettingPanel<WebAppOnLinuxDeployConfigura
         webAppOnLinuxDeployConfiguration.setDockerFilePath(containerSettingPanel.getDockerPath());
         // set ACR info
         webAppOnLinuxDeployConfiguration.setPrivateRegistryImageSetting(new PrivateRegistryImageSetting(
-            containerSettingPanel.getServerUrl().replaceFirst("^https?://", "").replaceFirst("/$", ""),
-            containerSettingPanel.getUserName(),
-            containerSettingPanel.getPassword(),
-            containerSettingPanel.getImageTag(),
-            containerSettingPanel.getStartupFile()
+                containerSettingPanel.getServerUrl().replaceFirst("^https?://", "").replaceFirst("/$", ""),
+                containerSettingPanel.getUserName(),
+                containerSettingPanel.getPassword(),
+                containerSettingPanel.getImageTag(),
+                containerSettingPanel.getStartupFile()
         ));
         savePassword(containerSettingPanel.getServerUrl(), containerSettingPanel.getUserName(),
-            containerSettingPanel.getPassword());
+                containerSettingPanel.getPassword());
 
         webAppOnLinuxDeployConfiguration.setTargetPath(getTargetPath());
         webAppOnLinuxDeployConfiguration.setTargetName(getTargetName());
@@ -376,16 +357,16 @@ public class SettingPanel extends AzureSettingPanel<WebAppOnLinuxDeployConfigura
         if (rdoUseExist.isSelected()) {
             // existing web app
             webAppOnLinuxDeployConfiguration.setCreatingNewWebAppOnLinux(false);
-            ResourceEx<WebApp> selectedWebApp = null;
-            int index = webAppTable.getSelectedRow();
+            IWebApp selectedWebApp = null;
+            final int index = webAppTable.getSelectedRow();
             if (cachedWebAppList != null && index >= 0 && index < cachedWebAppList.size()) {
                 selectedWebApp = cachedWebAppList.get(webAppTable.getSelectedRow());
             }
             if (selectedWebApp != null) {
-                webAppOnLinuxDeployConfiguration.setWebAppId(selectedWebApp.getResource().id());
-                webAppOnLinuxDeployConfiguration.setAppName(selectedWebApp.getResource().name());
-                webAppOnLinuxDeployConfiguration.setSubscriptionId(selectedWebApp.getSubscriptionId());
-                webAppOnLinuxDeployConfiguration.setResourceGroupName(selectedWebApp.getResource().resourceGroupName());
+                webAppOnLinuxDeployConfiguration.setWebAppId(selectedWebApp.id());
+                webAppOnLinuxDeployConfiguration.setAppName(selectedWebApp.name());
+                webAppOnLinuxDeployConfiguration.setSubscriptionId(selectedWebApp.subscriptionId());
+                webAppOnLinuxDeployConfiguration.setResourceGroupName(selectedWebApp.resourceGroup());
             } else {
                 webAppOnLinuxDeployConfiguration.setWebAppId(null);
                 webAppOnLinuxDeployConfiguration.setAppName(null);
@@ -397,18 +378,18 @@ public class SettingPanel extends AzureSettingPanel<WebAppOnLinuxDeployConfigura
             webAppOnLinuxDeployConfiguration.setCreatingNewWebAppOnLinux(true);
             webAppOnLinuxDeployConfiguration.setWebAppId("");
             webAppOnLinuxDeployConfiguration.setAppName(textAppName.getText());
-            Subscription selectedSubscription = (Subscription) comboSubscription.getSelectedItem();
+            final Subscription selectedSubscription = (Subscription) comboSubscription.getSelectedItem();
             if (selectedSubscription != null) {
-                webAppOnLinuxDeployConfiguration.setSubscriptionId(selectedSubscription.subscriptionId());
+                webAppOnLinuxDeployConfiguration.setSubscriptionId(selectedSubscription.getId());
             }
 
             // resource group
             if (rdoUseExistResGrp.isSelected()) {
                 // existing RG
                 webAppOnLinuxDeployConfiguration.setCreatingNewResourceGroup(false);
-                ResourceGroup selectedRg = (ResourceGroup) comboResourceGroup.getSelectedItem();
+                final ResourceGroup selectedRg = (ResourceGroup) comboResourceGroup.getSelectedItem();
                 if (selectedRg != null) {
-                    webAppOnLinuxDeployConfiguration.setResourceGroupName(selectedRg.name());
+                    webAppOnLinuxDeployConfiguration.setResourceGroupName(selectedRg.getName());
                 } else {
                     webAppOnLinuxDeployConfiguration.setResourceGroupName(null);
                 }
@@ -422,24 +403,24 @@ public class SettingPanel extends AzureSettingPanel<WebAppOnLinuxDeployConfigura
             if (rdoCreateAppServicePlan.isSelected()) {
                 webAppOnLinuxDeployConfiguration.setCreatingNewAppServicePlan(true);
                 webAppOnLinuxDeployConfiguration.setAppServicePlanName(txtCreateAppServicePlan.getText());
-                Location selectedLocation = (Location) cbLocation.getSelectedItem();
+                final Region selectedLocation = (Region) cbLocation.getSelectedItem();
                 if (selectedLocation != null) {
-                    webAppOnLinuxDeployConfiguration.setLocationName(selectedLocation.name());
+                    webAppOnLinuxDeployConfiguration.setLocationName(selectedLocation.getName());
                 } else {
                     webAppOnLinuxDeployConfiguration.setLocationName(null);
                 }
 
-                PricingTier selectedPricingTier = (PricingTier) cbPricing.getSelectedItem();
+                final PricingTier selectedPricingTier = (PricingTier) cbPricing.getSelectedItem();
                 if (selectedPricingTier != null) {
-                    webAppOnLinuxDeployConfiguration.setPricingSkuTier(selectedPricingTier.toSkuDescription().tier());
-                    webAppOnLinuxDeployConfiguration.setPricingSkuSize(selectedPricingTier.toSkuDescription().size());
+                    webAppOnLinuxDeployConfiguration.setPricingSkuTier(selectedPricingTier.getTier());
+                    webAppOnLinuxDeployConfiguration.setPricingSkuSize(selectedPricingTier.getSize());
                 } else {
                     webAppOnLinuxDeployConfiguration.setPricingSkuTier(null);
                     webAppOnLinuxDeployConfiguration.setPricingSkuSize(null);
                 }
             } else if (rdoUseExistAppServicePlan.isSelected()) {
                 webAppOnLinuxDeployConfiguration.setCreatingNewAppServicePlan(false);
-                AppServicePlan selectedAsp = (AppServicePlan) cbExistAppServicePlan.getSelectedItem();
+                final AppServicePlan selectedAsp = (AppServicePlan) cbExistAppServicePlan.getSelectedItem();
                 if (selectedAsp != null) {
                     webAppOnLinuxDeployConfiguration.setAppServicePlanId(selectedAsp.id());
                 } else {
@@ -465,7 +446,7 @@ public class SettingPanel extends AzureSettingPanel<WebAppOnLinuxDeployConfigura
             containerSettingPanel.setDockerPath(conf.getDockerFilePath());
         }
 
-        PrivateRegistryImageSetting acrInfo = conf.getPrivateRegistryImageSetting();
+        final PrivateRegistryImageSetting acrInfo = conf.getPrivateRegistryImageSetting();
         acrInfo.setPassword(loadPassword(acrInfo.getServerUrl(), acrInfo.getUsername()));
         containerSettingPanel.setTxtFields(acrInfo);
 
@@ -474,8 +455,8 @@ public class SettingPanel extends AzureSettingPanel<WebAppOnLinuxDeployConfigura
         defaultWebAppId = conf.getWebAppId();
         defaultLocationName = conf.getLocationName();
         defaultPricingTier = StringUtils.isEmpty(conf.getPricingSkuTier()) ?
-            Constant.WEBAPP_CONTAINER_DEFAULT_PRICING_TIER :
-            new PricingTier(conf.getPricingSkuTier(), conf.getPricingSkuSize()).toString();
+                Constant.WEBAPP_CONTAINER_DEFAULT_PRICING_TIER :
+                new PricingTier(conf.getPricingSkuTier(), conf.getPricingSkuSize()).toString();
         defaultResourceGroup = conf.getResourceGroupName();
         defaultAppServicePlanId = conf.getAppServicePlanId();
 
@@ -483,10 +464,10 @@ public class SettingPanel extends AzureSettingPanel<WebAppOnLinuxDeployConfigura
         loadWebAppList();
 
         // pnlCreateNew
-        webAppOnLinuxDeployPresenter.onLoadSubscriptionList(); // including related RG & Location
+        webAppOnLinuxDeployPresenter.onLoadSubscriptionList(); // including related RG & Region
         webAppOnLinuxDeployPresenter.onLoadPricingTierList();
 
-        boolean creatingRg = conf.isCreatingNewResourceGroup();
+        final boolean creatingRg = conf.isCreatingNewResourceGroup();
         rdoCreateResGrp.setSelected(creatingRg);
         rdoUseExistResGrp.setSelected(!creatingRg);
         updateResourceGroupEnabled();
@@ -494,7 +475,7 @@ public class SettingPanel extends AzureSettingPanel<WebAppOnLinuxDeployConfigura
             txtNewResGrp.setText(conf.getResourceGroupName());
         }
 
-        boolean creatingAsp = conf.isCreatingNewAppServicePlan();
+        final boolean creatingAsp = conf.isCreatingNewAppServicePlan();
         rdoCreateAppServicePlan.setSelected(creatingAsp);
         rdoUseExistAppServicePlan.setSelected(!creatingAsp);
         updateAppServicePlanEnabled();
@@ -503,7 +484,7 @@ public class SettingPanel extends AzureSettingPanel<WebAppOnLinuxDeployConfigura
         }
 
         // active panel
-        boolean creatingApp = conf.isCreatingNewWebAppOnLinux();
+        final boolean creatingApp = conf.isCreatingNewWebAppOnLinux();
         if (creatingApp) {
             textAppName.setText(conf.getAppName());
         }
@@ -512,8 +493,8 @@ public class SettingPanel extends AzureSettingPanel<WebAppOnLinuxDeployConfigura
         updatePanelVisibility();
 
         // default value for new resources
-        DateFormat df = new SimpleDateFormat("yyMMddHHmmss");
-        String date = df.format(new Date());
+        final DateFormat df = new SimpleDateFormat("yyMMddHHmmss");
+        final String date = df.format(new Date());
         if (Utils.isEmptyString(textAppName.getText())) {
             textAppName.setText(String.format("%s-%s", APP_NAME_PREFIX, date));
         }
@@ -534,7 +515,7 @@ public class SettingPanel extends AzureSettingPanel<WebAppOnLinuxDeployConfigura
     private void createUIComponents() {
         containerSettingPanel = new ContainerSettingPanel(project);
         // create table of Web App on Linux
-        DefaultTableModel tableModel = new DefaultTableModel() {
+        final DefaultTableModel tableModel = new DefaultTableModel() {
             @Override
             public boolean isCellEditable(int row, int column) {
                 return false;
@@ -548,9 +529,9 @@ public class SettingPanel extends AzureSettingPanel<WebAppOnLinuxDeployConfigura
         webAppTable.setDragEnabled(false);
         webAppTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         webAppTable.getSelectionModel().addListSelectionListener(event -> {
-            int index = webAppTable.getSelectedRow();
+            final int index = webAppTable.getSelectedRow();
             if (cachedWebAppList != null && index >= 0 && index < cachedWebAppList.size()) {
-                textSelectedAppName.setText(cachedWebAppList.get(webAppTable.getSelectedRow()).getResource().name());
+                textSelectedAppName.setText(cachedWebAppList.get(webAppTable.getSelectedRow()).name());
             }
         });
         btnRefresh = new AnActionButton("Refresh", AllIcons.Actions.Refresh) {
@@ -558,14 +539,14 @@ public class SettingPanel extends AzureSettingPanel<WebAppOnLinuxDeployConfigura
             public void actionPerformed(AnActionEvent anActionEvent) {
                 btnRefresh.setEnabled(false);
                 webAppTable.getEmptyText().setText(TABLE_LOADING_MESSAGE);
-                DefaultTableModel model = (DefaultTableModel) webAppTable.getModel();
+                final DefaultTableModel model = (DefaultTableModel) webAppTable.getModel();
                 model.getDataVector().clear();
                 model.fireTableDataChanged();
                 textSelectedAppName.setText("");
                 webAppOnLinuxDeployPresenter.onRefreshList();
             }
         };
-        ToolbarDecorator tableToolbarDecorator = ToolbarDecorator.createDecorator(webAppTable)
+        final ToolbarDecorator tableToolbarDecorator = ToolbarDecorator.createDecorator(webAppTable)
                 .addExtraActions(btnRefresh).setToolbarPosition(ActionToolbarPosition.TOP);
         pnlWebAppOnLinuxTable = tableToolbarDecorator.createPanel();
 
@@ -582,28 +563,24 @@ public class SettingPanel extends AzureSettingPanel<WebAppOnLinuxDeployConfigura
     }
 
     @Override
-    public void renderWebAppOnLinuxList(List<ResourceEx<WebApp>> webAppOnLinuxList) {
+    public void renderWebAppOnLinuxList(List<IWebApp> webAppOnLinuxList) {
         btnRefresh.setEnabled(true);
         webAppTable.getEmptyText().setText(TABLE_EMPTY_MESSAGE);
-        List<ResourceEx<WebApp>> sortedList = webAppOnLinuxList.stream()
-                .sorted((a, b) -> a.getSubscriptionId().compareToIgnoreCase(b.getSubscriptionId()))
+        final List<IWebApp> sortedList = webAppOnLinuxList.stream()
+                .sorted((a, b) -> a.subscriptionId().compareToIgnoreCase(b.subscriptionId()))
                 .collect(Collectors.toList());
         cachedWebAppList = sortedList;
         if (cachedWebAppList.size() > 0) {
-            DefaultTableModel model = (DefaultTableModel) webAppTable.getModel();
+            final DefaultTableModel model = (DefaultTableModel) webAppTable.getModel();
             model.getDataVector().clear();
-            for (ResourceEx<WebApp> resource : sortedList) {
-                WebApp app = resource.getResource();
-                model.addRow(new String[]{
-                        app.name(),
-                        app.resourceGroupName()
-                });
+            for (final IWebApp resource : sortedList) {
+                model.addRow(new String[]{resource.name(), resource.resourceGroup()});
             }
         }
 
         // select active web app
         for (int index = 0; index < cachedWebAppList.size(); index++) {
-            if (Comparing.equal(cachedWebAppList.get(index).getResource().id(), defaultWebAppId)) {
+            if (StringUtils.equals(cachedWebAppList.get(index).id(), defaultWebAppId)) {
                 webAppTable.setRowSelectionInterval(index, index);
                 // defaultWebAppId = null; // clear to select nothing in future refreshing
                 break;
@@ -617,7 +594,7 @@ public class SettingPanel extends AzureSettingPanel<WebAppOnLinuxDeployConfigura
         if (subscriptions != null && subscriptions.size() > 0) {
             subscriptions.forEach((item) -> {
                 comboSubscription.addItem(item);
-                if (Comparing.equal(item.subscriptionId(), defaultSubscriptionId)) {
+                if (StringUtils.equals(item.getId(), defaultSubscriptionId)) {
                     comboSubscription.setSelectedItem(item);
                     defaultSubscriptionId = null;
                 }
@@ -631,7 +608,7 @@ public class SettingPanel extends AzureSettingPanel<WebAppOnLinuxDeployConfigura
         if (resourceGroupList != null && resourceGroupList.size() > 0) {
             resourceGroupList.forEach((item) -> {
                 comboResourceGroup.addItem(item);
-                if (Comparing.equal(item.name(), defaultResourceGroup)) {
+                if (StringUtils.equals(item.getName(), defaultResourceGroup)) {
                     comboResourceGroup.setSelectedItem(item);
                     // defaultResourceGroup = null;
                 }
@@ -640,12 +617,12 @@ public class SettingPanel extends AzureSettingPanel<WebAppOnLinuxDeployConfigura
     }
 
     @Override
-    public void renderLocationList(List<Location> locationList) {
+    public void renderLocationList(List<Region> locationList) {
         cbLocation.removeAllItems();
         if (locationList != null && locationList.size() > 0) {
             locationList.forEach((item) -> {
                 cbLocation.addItem(item);
-                if (Comparing.equal(item.name(), defaultLocationName)) {
+                if (StringUtils.equals(item.getName(), defaultLocationName)) {
                     cbLocation.setSelectedItem(item);
                     // defaultLocationName = null;
                 }
@@ -654,14 +631,14 @@ public class SettingPanel extends AzureSettingPanel<WebAppOnLinuxDeployConfigura
     }
 
     @Override
-    public void renderAppServicePlanList(List<AppServicePlan> appServicePlans) {
+    public void renderAppServicePlanList(List<IAppServicePlan> appServicePlans) {
         cbExistAppServicePlan.removeAllItems();
         lblLocation.setText(NOT_APPLICABLE);
         lblPricing.setText(NOT_APPLICABLE);
         if (appServicePlans != null && appServicePlans.size() > 0) {
             appServicePlans.forEach((item) -> {
                 cbExistAppServicePlan.addItem(item);
-                if (Comparing.equal(item.id(), defaultAppServicePlanId)) {
+                if (StringUtils.equals(item.id(), defaultAppServicePlanId)) {
                     cbExistAppServicePlan.setSelectedItem(item);
                     // defaultAppServicePlanId = null;
                 }
@@ -675,7 +652,7 @@ public class SettingPanel extends AzureSettingPanel<WebAppOnLinuxDeployConfigura
         if (pricingTierList != null && pricingTierList.size() > 0) {
             pricingTierList.forEach((item) -> {
                 cbPricing.addItem(item);
-                if (Comparing.equal(item.toString(), defaultPricingTier)) {
+                if (StringUtils.equals(item.toString(), defaultPricingTier)) {
                     cbPricing.setSelectedItem(item);
                 }
             });
@@ -684,7 +661,6 @@ public class SettingPanel extends AzureSettingPanel<WebAppOnLinuxDeployConfigura
 
     /**
      * Let the presenter release the view. Will be called by:
-     * {@link com.microsoft.azure.toolkit.intellij.webapp.docker.webapponlinux.WebAppOnLinuxDeploySettingsEditor#disposeEditor()}.
      */
     @Override
     public void disposeEditor() {
@@ -709,5 +685,6 @@ public class SettingPanel extends AzureSettingPanel<WebAppOnLinuxDeployConfigura
         webAppOnLinuxDeployPresenter.onLoadAppServicePlan(sid);
     }
 
-    private void $$$setupUI$$$(){}
+    private void $$$setupUI$$$() {
+    }
 }

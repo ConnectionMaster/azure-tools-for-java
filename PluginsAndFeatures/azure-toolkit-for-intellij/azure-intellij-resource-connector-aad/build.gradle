@@ -1,0 +1,5 @@
+dependencies {
+    implementation project(":azure-intellij-plugin-lib")
+
+    implementation 'com.microsoft.graph:microsoft-graph:3.7.0'
+}

@@ -29,7 +29,7 @@
           <text value="Server name:"/>
         </properties>
       </component>
-      <component id="c92f8" class="com.microsoft.azure.toolkit.intellij.mysql.ServerNameTextField" binding="serverNameTextField">
+      <component id="c92f8" class="com.microsoft.azure.toolkit.intellij.database.ServerNameTextField" binding="serverNameTextField">
         <constraints>
           <grid row="1" column="1" row-span="1" col-span="1" vsize-policy="0" hsize-policy="6" anchor="8" fill="1" indent="1" use-parent-layout="false">
             <preferred-size width="150" height="-1"/>
@@ -45,7 +45,7 @@
           <text value="Admin username:"/>
         </properties>
       </component>
-      <component id="778af" class="com.microsoft.azure.toolkit.intellij.mysql.AdminUsernameTextField" binding="adminUsernameTextField">
+      <component id="778af" class="com.microsoft.azure.toolkit.intellij.database.AdminUsernameTextField" binding="adminUsernameTextField">
         <constraints>
           <grid row="2" column="1" row-span="1" col-span="1" vsize-policy="0" hsize-policy="6" anchor="8" fill="1" indent="1" use-parent-layout="false">
             <preferred-size width="150" height="-1"/>

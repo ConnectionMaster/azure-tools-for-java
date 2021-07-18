@@ -1,42 +1,37 @@
 /*
- * Copyright (c) Microsoft Corporation
- *
- * All rights reserved.
- *
- * MIT License
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
- * documentation files (the "Software"), to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and
- * to permit persons to whom the Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all copies or substantial portions of
- * the Software.
- *
- * THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
- * THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Licensed under the MIT License. See License.txt in the project root for license information.
  */
 
 package com.microsoft.intellij.ui;
 
 import com.intellij.openapi.ui.TitlePanel;
 import com.microsoft.applicationinsights.preference.ApplicationInsightsResource;
-import com.microsoft.azure.management.Azure;
 import com.microsoft.azure.management.applicationinsights.v2015_05_01.ApplicationInsightsComponent;
+import com.microsoft.azure.toolkit.intellij.appservice.region.RegionComboBox;
+import com.microsoft.azure.toolkit.intellij.appservice.subscription.SubscriptionComboBox;
+import com.microsoft.azure.toolkit.lib.common.model.ResourceGroup;
+import com.microsoft.azure.toolkit.lib.common.model.Subscription;
+import com.microsoft.azure.toolkit.lib.common.operation.AzureOperationBundle;
+import com.microsoft.azure.toolkit.lib.common.operation.IAzureOperationTitle;
 import com.microsoft.azure.toolkit.lib.common.task.AzureTask;
 import com.microsoft.azure.toolkit.lib.common.task.AzureTaskManager;
 import com.microsoft.azuretools.authmanage.AuthMethodManager;
-import com.microsoft.azuretools.authmanage.models.SubscriptionDetail;
+import com.microsoft.azuretools.core.mvp.model.AzureMvpModel;
+import com.microsoft.azuretools.core.mvp.model.ResourceEx;
 import com.microsoft.azuretools.sdkmanage.AzureManager;
 import com.microsoft.intellij.AzurePlugin;
 import com.microsoft.intellij.ui.components.AzureDialogWrapper;
 import com.microsoft.intellij.util.PluginUtil;
 import com.microsoft.tooling.msservices.helpers.azure.sdk.AzureSDKManager;
 
-import javax.swing.*;
+import javax.swing.ButtonGroup;
+import javax.swing.DefaultComboBoxModel;
+import javax.swing.JComboBox;
+import javax.swing.JComponent;
+import javax.swing.JPanel;
+import javax.swing.JRadioButton;
+import javax.swing.JTextField;
 import java.awt.event.ItemEvent;
 import java.awt.event.ItemListener;
 import java.util.List;
@@ -48,13 +43,13 @@ import static com.microsoft.intellij.ui.messages.AzureBundle.message;
 public class ApplicationInsightsNewDialog extends AzureDialogWrapper {
     private JPanel contentPane;
     private JTextField txtName;
-    private JComboBox comboSub;
+    private SubscriptionComboBox comboSub;
     private JComboBox comboGrp;
-    private JComboBox comboReg;
+    private RegionComboBox comboReg;
     private JRadioButton createNewBtn;
     private JRadioButton useExistingBtn;
     private JTextField textGrp;
-    private SubscriptionDetail currentSub;
+    private Subscription currentSub;
     static ApplicationInsightsResource resourceToAdd;
     private AzureManager azureManager;
     private Runnable onCreate;
@@ -91,57 +86,31 @@ public class ApplicationInsightsNewDialog extends AzureDialogWrapper {
         useExistingBtn.addItemListener(updateListener);
 
         createNewBtn.setSelected(true);
-        populateValues();
+    }
+
+    private void createUIComponents() {
+        this.comboSub = new SubscriptionComboBox();
+        this.comboReg = new RegionComboBox();
     }
 
     private ItemListener subscriptionListener() {
-        return new ItemListener() {
-            @Override
-            public void itemStateChanged(ItemEvent e) {
-                SubscriptionDetail newSub = (SubscriptionDetail) comboSub.getSelectedItem();
-                String prevResGrpVal = (String) comboGrp.getSelectedItem();
-                if (currentSub.equals(newSub)) {
-                    populateResourceGroupValues(currentSub.getSubscriptionId(), prevResGrpVal);
-                } else {
-                    populateResourceGroupValues(currentSub.getSubscriptionId(), "");
-                }
-                currentSub = newSub;
+        return e -> {
+            Subscription newSub = (Subscription) comboSub.getSelectedItem();
+            String prevResGrpVal = (String) comboGrp.getSelectedItem();
+            this.comboReg.setSubscription(newSub);
+            if (currentSub.equals(newSub)) {
+                populateResourceGroupValues(currentSub.getId(), prevResGrpVal);
+            } else {
+                populateResourceGroupValues(currentSub.getId(), "");
             }
+            currentSub = newSub;
         };
-    }
-
-    private void populateValues() {
-        try {
-            if (azureManager == null || azureManager.getSubscriptionManager() == null) {
-                // Didn't sign in
-                return;
-            }
-            List<SubscriptionDetail> subList = azureManager.getSubscriptionManager().getSubscriptionDetails()
-                    .stream().filter(SubscriptionDetail::isSelected).collect(Collectors.toList());
-            // check at least single subscription is associated with the account
-            if (subList.size() > 0) {
-                comboSub.setModel(new DefaultComboBoxModel(subList.toArray()));
-                comboSub.setSelectedIndex(0);
-                currentSub = subList.get(0);
-
-                populateResourceGroupValues(currentSub.getSubscriptionId(), "");
-
-                List<String> regionList = AzureSDKManager.getLocationsForInsights(currentSub);
-                String[] regionArray = regionList.toArray(new String[regionList.size()]);
-                comboReg.setModel(new DefaultComboBoxModel(regionArray));
-                comboReg.setSelectedItem(regionArray[0]);
-            }
-        } catch (Exception ex) {
-            AzurePlugin.log(message("getValuesErrMsg"), ex);
-        }
     }
 
     private void populateResourceGroupValues(String subscriptionId, String valtoSet) {
         try {
-            AzureManager manager = AuthMethodManager.getInstance().getAzureManager();
-            Azure azure = manager.getAzure(subscriptionId);
-            List<com.microsoft.azure.management.resources.ResourceGroup> groups = azure.resourceGroups().list();
-            List<String> groupStringList = groups.stream().map(com.microsoft.azure.management.resources.ResourceGroup::name).collect(Collectors.toList());
+            List<String> groupStringList = AzureMvpModel.getInstance().getResourceGroups(subscriptionId).stream()
+                    .map(ResourceEx::getResource).map(ResourceGroup::getName).collect(Collectors.toList());
             if (groupStringList.size() > 0) {
                 String[] groupArray = groupStringList.toArray(new String[groupStringList.size()]);
                 comboGrp.removeAllItems();
@@ -187,7 +156,7 @@ public class ApplicationInsightsNewDialog extends AzureDialogWrapper {
         } else {
             boolean isNewGroup = createNewBtn.isSelected();
             String resourceGroup = isNewGroup ? textGrp.getText() : (String) comboGrp.getSelectedItem();
-            final String title = "Creating Application Insights Resource " + txtName.getText();
+            final IAzureOperationTitle title = AzureOperationBundle.title("ai.create.rg", txtName.getText(), resourceGroup);
             AzureTaskManager.getInstance().runInBackground(new AzureTask(null, title, false, () -> {
                 try {
                     ApplicationInsightsComponent resource = AzureSDKManager.createInsightsResource(

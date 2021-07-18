@@ -1,23 +1,6 @@
 /*
- * Copyright (c) Microsoft Corporation
- *
- * All rights reserved.
- *
- * MIT License
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
- * documentation files (the "Software"), to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and
- * to permit persons to whom the Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all copies or substantial portions of
- * the Software.
- *
- * THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
- * THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Licensed under the MIT License. See License.txt in the project root for license information.
  */
 
 package com.microsoft.azure.toolkit.intellij.appservice.action;
@@ -26,17 +9,18 @@ import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.DialogWrapper;
-import com.microsoft.azure.management.appservice.OperatingSystem;
-import com.microsoft.azure.management.appservice.WebApp;
-import com.microsoft.azure.management.appservice.WebAppBase;
 import com.microsoft.azure.toolkit.intellij.appservice.jfr.RunFlightRecorderDialog;
 import com.microsoft.azure.toolkit.lib.appservice.jfr.FlightRecorderConfiguration;
 import com.microsoft.azure.toolkit.lib.appservice.jfr.FlightRecorderManager;
 import com.microsoft.azure.toolkit.lib.appservice.jfr.FlightRecorderStarterBase;
+import com.microsoft.azure.toolkit.lib.appservice.model.OperatingSystem;
+import com.microsoft.azure.toolkit.lib.appservice.service.IAppService;
+import com.microsoft.azure.toolkit.lib.appservice.utils.Utils;
+import com.microsoft.azure.toolkit.lib.common.operation.AzureOperationBundle;
+import com.microsoft.azure.toolkit.lib.common.operation.IAzureOperationTitle;
 import com.microsoft.azure.toolkit.lib.common.task.AzureTask;
 import com.microsoft.azure.toolkit.lib.common.task.AzureTaskManager;
 import com.microsoft.azuretools.core.mvp.model.AzureMvpModel;
-import com.microsoft.azuretools.core.mvp.model.webapp.AzureWebAppMvpModel;
 import com.microsoft.azuretools.telemetry.TelemetryConstants;
 import com.microsoft.azuretools.telemetrywrapper.EventUtil;
 import com.microsoft.intellij.util.PluginUtil;
@@ -56,42 +40,44 @@ import java.util.logging.Logger;
 
 import static com.microsoft.intellij.ui.messages.AzureBundle.message;
 
+// todo: Migrate profile client implementation to track2 sdk
 @Name("Profile Flight Recorder")
 public class ProfileFlightRecordAction extends NodeActionListener {
     private static final Logger logger = Logger.getLogger(ProfileFlightRecordAction.class.getName());
-    private static final String PROFILE_FLIGHT_RECORDER = "Profile Flight Recorder";
     private static final int ONE_SECOND = 1000;
     private static final int TWO_SECONDS = 2000;
     private final Project project;
-    private WebAppBase appService;
+    private final String webAppId;
+
+    private IAppService appService;
 
     public ProfileFlightRecordAction(WebAppNode webAppNode) {
         super();
         this.project = (Project) webAppNode.getProject();
-        appService = webAppNode.getWebapp();
+        this.webAppId = webAppNode.getWebAppId();
+        this.appService = webAppNode.getWebappManager();
     }
 
     @Override
     protected void actionPerformed(NodeActionEvent nodeActionEvent) {
-        // prerequisite check
-        if (appService.operatingSystem() == OperatingSystem.LINUX &&
-                StringUtils.containsIgnoreCase(appService.linuxFxVersion(), "DOCKER|")) {
-            final String message = message("webapp.flightRecord.error.notSupport.message", appService.name());
-            notifyUserWithErrorMessage(message("webapp.flightRecord.error.notSupport.title"), message);
-            return;
-        }
-        EventUtil.executeWithLog(appService instanceof WebApp ? TelemetryConstants.WEBAPP : TelemetryConstants.FUNCTION,
-                                 "start-flight-recorder", op -> {
-                final AzureTask task = new AzureTask(project, PROFILE_FLIGHT_RECORDER, true, this::doProfileFlightRecorderAll, AzureTask.Modality.ANY);
-                AzureTaskManager.getInstance().runInBackground(task);
-            });
+        EventUtil.executeWithLog(TelemetryConstants.WEBAPP, "start-flight-recorder", op -> {
+            op.trackProperty(TelemetryConstants.SUBSCRIPTIONID, Utils.getSubscriptionId(webAppId));
+            final IAzureOperationTitle title = AzureOperationBundle.title("appservice|flight_recorder.profile");
+            final AzureTask task = new AzureTask(project, title, true, this::doProfileFlightRecorderAll, AzureTask.Modality.ANY);
+            AzureTaskManager.getInstance().runInBackground(task);
+        });
     }
 
     private void doProfileFlightRecorderAll() {
         try {
-            final String subscriptionId = AzureMvpModel.getSegment(appService.id(), "subscriptions");
+            // prerequisite check
+            final String subscriptionId = AzureMvpModel.getSegment(webAppId, "subscriptions");
             // Always get latest app service status, workaround for https://dev.azure.com/mseng/VSJava/_workitems/edit/1797916
-            appService = AzureWebAppMvpModel.getInstance().getWebAppById(subscriptionId, appService.id());
+            if (appService.getRuntime().getOperatingSystem() == OperatingSystem.DOCKER) {
+                final String message = message("webapp.flightRecord.error.notSupport.message", appService.name());
+                notifyUserWithErrorMessage(message("webapp.flightRecord.error.notSupport.title"), message);
+                return;
+            }
             if (!StringUtils.equalsIgnoreCase(appService.state(), "running")) {
                 final String message = message("webapp.flightRecord.error.notRunning.message", appService.name());
                 notifyUserWithErrorMessage(message("webapp.flightRecord.error.notRunning.title"), message);
@@ -123,13 +109,13 @@ public class ProfileFlightRecordAction extends NodeActionListener {
             finishLatch.await();
         } catch (Exception ex) {
             notifyUserWithErrorMessage(
-                    message("webapp.flightRecord.error.profileFailed.title"), message("webapp.flightRecord.error.profileFailed.message") + ex.getMessage());
+                message("webapp.flightRecord.error.profileFailed.title"), message("webapp.flightRecord.error.profileFailed.message") + ex.getMessage());
         }
     }
 
     private FlightRecorderConfiguration collectFlightRecorderConfiguration() {
         RunFlightRecorderDialog ui = new RunFlightRecorderDialog(project, appService);
-        ui.setTitle(message("webapp.flightRecord.task.startRecorder.title", appService.defaultHostName()));
+        ui.setTitle(message("webapp.flightRecord.task.startRecorder.title", appService.hostName()));
         ui.setOkActionListener((config) -> {
             ui.close(DialogWrapper.OK_EXIT_CODE);
         });
@@ -180,8 +166,8 @@ public class ProfileFlightRecordAction extends NodeActionListener {
 
     private void notifyUserWithErrorMessage(String title, String errorMessage) {
         PluginUtil.showErrorNotificationProject(
-                project, title,
-                errorMessage);
+            project, title,
+            errorMessage);
     }
 
     private String getActionOnJfrFile(String filePath) {

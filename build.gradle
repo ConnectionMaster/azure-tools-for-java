@@ -1,4 +1,9 @@
 import org.gradle.internal.os.OperatingSystem
+import org.ajoberstar.grgit.*
+
+plugins {
+  id "org.ajoberstar.grgit" version "4.1.0"
+}
 
 def gradleExec = file(OperatingSystem.current().isWindows() ? "gradlew.bat" : "gradlew")
 def mavenExec = file(OperatingSystem.current().isWindows() ? "mvnw.cmd" : "mvnw")
@@ -44,7 +49,22 @@ ext.maven = { Closure mavenClosure ->
      tasks.withType(Exec) { environment << envVars }
 }
 
+task buildToolkitsLib {
+    doLast {
+        logger.info('Building Toolkits Lib ...')
+        def tempDir = File.createTempDir()
+        tempDir.deleteOnExit()
+        Grgit.clone(dir: file(tempDir), uri: 'https://github.com/microsoft/azure-maven-plugins.git')
+
+        maven {
+            goals = "install"
+            pom = file("${tempDir}/azure-toolkit-libs/pom.xml")
+        }
+    }
+}
+
 task buildUtils {
+    dependsOn buildToolkitsLib
     doLast {
         logger.info('Building Utils ...')
         maven {

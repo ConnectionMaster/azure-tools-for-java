@@ -47,6 +47,7 @@ public class MySQLCreationDialog extends AzureDialog<AzureMySQLConfig> {
         init();
     }
 
+    @Override
     protected void init() {
         super.init();
         advanced.setVisible(false);

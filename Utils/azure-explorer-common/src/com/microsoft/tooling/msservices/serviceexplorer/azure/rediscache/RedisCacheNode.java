@@ -1,27 +1,12 @@
 /*
- * Copyright (c) Microsoft Corporation
- *
- * All rights reserved.
- *
- * MIT License
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
- * documentation files (the "Software"), to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and
- * to permit persons to whom the Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all copies or substantial portions of
- * the Software.
- *
- * THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
- * THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Licensed under the MIT License. See License.txt in the project root for license information.
  */
 
 package com.microsoft.tooling.msservices.serviceexplorer.azure.rediscache;
 
+import com.microsoft.azure.toolkit.lib.common.operation.AzureOperation;
+import com.microsoft.azuretools.ActionConstants;
 import com.microsoft.azuretools.authmanage.AuthMethodManager;
 import com.microsoft.azuretools.azurecommons.helpers.Nullable;
 import com.microsoft.azuretools.core.mvp.ui.base.NodeContent;
@@ -96,9 +81,9 @@ public class RedisCacheNode extends Node implements TelemetryProperties {
         if (!CREATING_STATE.equals(this.provisionState)) {
             addAction(initActionBuilder(this::delete).withAction(AzureActionEnum.DELETE).withBackgroudable(true).withPromptable(true).build());
             addAction(initActionBuilder(this::showProperties).withAction(AzureActionEnum.SHOW_PROPERTIES).build());
-            addAction(OPEN_EXPLORER, initActionBuilder(this::openExplorer).withDoingName("Opening").build());
+            addAction(OPEN_EXPLORER, initActionBuilder(this::openExplorer).build("Opening"));
         }
-        addAction(initActionBuilder(this::openInBrowser).withAction(AzureActionEnum.OPEN_IN_PORTAL).withBackgroudable(true).build());
+        addAction(initActionBuilder(this::openInPortal).withAction(AzureActionEnum.OPEN_IN_PORTAL).withBackgroudable(true).build());
         super.loadActions();
     }
 
@@ -123,11 +108,13 @@ public class RedisCacheNode extends Node implements TelemetryProperties {
         return this.resourceId;
     }
 
+    @AzureOperation(name = "redis.delete", params = {"this.name"}, type = AzureOperation.Type.ACTION)
     private void delete() {
         this.getParent().removeNode(this.subscriptionId, this.resourceId, this);
     }
 
-    private void openInBrowser() {
+    @AzureOperation(name = "redis.open_portal", params = {"this.name"}, type = AzureOperation.Type.ACTION)
+    private void openInPortal() {
         String portalUrl = "";
         try {
             portalUrl = AuthMethodManager.getInstance().getAzureManager().getPortalUrl();
@@ -137,10 +124,12 @@ public class RedisCacheNode extends Node implements TelemetryProperties {
         DefaultLoader.getUIHelper().openInBrowser(String.format(AZURE_PORTAL_LINK_FORMAT, portalUrl, this.resourceId));
     }
 
+    @AzureOperation(name = "redis.show_properties", params = {"this.name"}, type = AzureOperation.Type.ACTION)
     private void showProperties() {
         DefaultLoader.getUIHelper().openRedisPropertyView(this);
     }
 
+    @AzureOperation(name = "redis.open_explorer", params = {"this.name"}, type = AzureOperation.Type.ACTION)
     private void openExplorer() {
         DefaultLoader.getUIHelper().openRedisExplorer(this);
     }

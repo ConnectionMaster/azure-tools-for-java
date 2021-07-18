@@ -1,36 +1,18 @@
 /*
- * Copyright (c) Microsoft Corporation
- *
- * All rights reserved.
- *
- * MIT License
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
- * documentation files (the "Software"), to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and
- * to permit persons to whom the Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all copies or substantial portions of
- * the Software.
- *
- * THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
- * THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Licensed under the MIT License. See License.txt in the project root for license information.
  */
 
 package com.microsoft.tooling.msservices.serviceexplorer;
 
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
-import com.microsoft.azure.toolkit.lib.common.handler.AzureExceptionHandler;
+import com.microsoft.azure.toolkit.lib.common.messager.AzureMessager;
 import com.microsoft.azuretools.azurecommons.helpers.AzureCmdException;
 import com.microsoft.azuretools.telemetry.AppInsightsClient;
 import com.microsoft.azuretools.telemetry.TelemetryConstants;
 import com.microsoft.azuretools.telemetry.TelemetryProperties;
 import com.microsoft.azuretools.telemetrywrapper.ErrorType;
-import com.microsoft.azuretools.telemetrywrapper.EventType;
 import com.microsoft.azuretools.telemetrywrapper.EventUtil;
 import com.microsoft.azuretools.telemetrywrapper.Operation;
 import com.microsoft.azuretools.telemetrywrapper.TelemetryManager;
@@ -80,14 +62,8 @@ public abstract class NodeActionListener implements EventListener, Sortable, Gro
 
     protected Map<String, String> buildProp(Node node) {
         final Map<String, String> properties = new HashMap<>();
-        properties.put("Node", node.getId());
-        properties.put("Name", node.getName());
         if (node instanceof TelemetryProperties) {
             properties.putAll(((TelemetryProperties) node).toProperties());
-        }
-        if (node.getParent() != null) {
-            properties.put("Parent", node.getParent().getName());
-            properties.put("ParentType", node.getParent().getClass().getSimpleName());
         }
         return properties;
     }
@@ -110,12 +86,12 @@ public abstract class NodeActionListener implements EventListener, Sortable, Gro
         try {
             operation.start();
             Node node = e.getAction().getNode();
-            EventUtil.logEvent(EventType.info, operation, buildProp(node));
+            operation.trackProperties(buildProp(node));
             actionPerformed(e);
             return Futures.immediateFuture(null);
         } catch (AzureCmdException | RuntimeException ex) {
             EventUtil.logError(operation, ErrorType.systemError, ex, null, null);
-            AzureExceptionHandler.getInstance().handleException(ex, false);
+            AzureMessager.getMessager().error(ex);
             return Futures.immediateFailedFuture(ex);
         } finally {
             operation.complete();

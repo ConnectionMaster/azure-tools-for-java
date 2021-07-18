@@ -1,35 +1,22 @@
 /*
- * Copyright (c) Microsoft Corporation
- *
- * All rights reserved.
- *
- * MIT License
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
- * documentation files (the "Software"), to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and
- * to permit persons to whom the Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all copies or substantial portions of
- * the Software.
- *
- * THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
- * THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Licensed under the MIT License. See License.txt in the project root for license information.
  */
 
 package com.microsoft.azuretools.utils;
 
 import com.google.gson.reflect.TypeToken;
+import com.microsoft.azure.toolkit.lib.Azure;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.exec.DefaultExecuteResultHandler;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.logging.Logger;
 
 /**
@@ -110,7 +97,7 @@ public class AzureCliUtils {
      */
     public static CommandUtils.CommandExecOutput executeCommandAndGetOutputWithCompleteKeyWord(final String[] parameters
             , final String[] sucessKeyWords, final String[] failedKeyWords) throws IOException, InterruptedException {
-        CommandUtils.CommandExecutionOutput executionOutput = CommandUtils.executeCommandAndGetExecution(CLI_GROUP_AZ, parameters);
+        CommandUtils.CommandExecutionOutput executionOutput = CommandUtils.executeCommandAndGetExecution(CLI_GROUP_AZ, parameters, getProxyEnvs());
         CommandUtils.CommandExecOutput commandExecOutput = new CommandUtils.CommandExecOutput();
         if (ArrayUtils.isEmpty(sucessKeyWords) && ArrayUtils.isEmpty(failedKeyWords)) {
             commandExecOutput.setSuccess(true);
@@ -146,7 +133,7 @@ public class AzureCliUtils {
     }
 
     private static boolean isCliCommandExecutedStatus(String[] parameters) throws IOException, InterruptedException {
-        DefaultExecuteResultHandler resultHandler = CommandUtils.executeCommandAndGetResultHandler(CLI_GROUP_AZ, parameters);
+        DefaultExecuteResultHandler resultHandler = CommandUtils.executeCommandAndGetResultHandler(CLI_GROUP_AZ, parameters, getProxyEnvs());
         resultHandler.waitFor(CMD_EXEC_TIMEOUT);
         int exitValue = resultHandler.getExitValue();
         logger.info("exitCode: " + exitValue);
@@ -157,7 +144,7 @@ public class AzureCliUtils {
     }
 
     private static String executeCliCommandAndGetOutputIfSuccess(String[] parameters) throws IOException, InterruptedException {
-        CommandUtils.CommandExecutionOutput executionOutput = CommandUtils.executeCommandAndGetExecution(CLI_GROUP_AZ, parameters);
+        CommandUtils.CommandExecutionOutput executionOutput = CommandUtils.executeCommandAndGetExecution(CLI_GROUP_AZ, parameters, getProxyEnvs());
         executionOutput.getResultHandler().waitFor(CMD_EXEC_TIMEOUT);
         int exitValue = executionOutput.getResultHandler().getExitValue();
         logger.info("exitCode: " + exitValue);
@@ -165,6 +152,17 @@ public class AzureCliUtils {
             return executionOutput.getOutputStream().toString();
         }
         return null;
+    }
+
+    private static Map<String, String> getProxyEnvs() {
+        final InetSocketAddress proxy = Azure.az().config().getHttpProxy();
+        Map<String, String> env = new HashMap<>();
+        if (proxy != null) {
+            String proxyStr = String.format("http://%s:%s", proxy.getHostString(), proxy.getPort());
+            env.put("HTTPS_PROXY", proxyStr);
+            env.put("HTTP_PROXY", proxyStr);
+        }
+        return env;
     }
 
     private static boolean checkCommendExecComplete(String outputMessage, String errorMessage, String[] completeKeyWords) {

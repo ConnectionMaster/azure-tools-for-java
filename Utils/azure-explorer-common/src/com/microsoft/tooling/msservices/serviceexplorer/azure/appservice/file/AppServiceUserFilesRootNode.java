@@ -1,57 +1,46 @@
 /*
- * Copyright (c) Microsoft Corporation
- *
- * All rights reserved.
- *
- * MIT License
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
- * documentation files (the "Software"), to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and
- * to permit persons to whom the Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all copies or substantial portions of
- * the Software.
- *
- * THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
- * THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Licensed under the MIT License. See License.txt in the project root for license information.
  */
 
 package com.microsoft.tooling.msservices.serviceexplorer.azure.appservice.file;
 
-import com.microsoft.azure.management.appservice.WebAppBase;
-import com.microsoft.azure.toolkit.lib.appservice.file.AppServiceFileService;
+import com.microsoft.azure.toolkit.lib.appservice.service.IAppService;
+import com.microsoft.azure.toolkit.lib.appservice.service.IFunctionAppBase;
 import com.microsoft.azure.toolkit.lib.common.operation.AzureOperation;
 import com.microsoft.azuretools.azurecommons.helpers.NotNull;
 import com.microsoft.azuretools.azurecommons.helpers.Nullable;
+import com.microsoft.azuretools.telemetry.AppInsightsConstants;
+import com.microsoft.azuretools.telemetry.TelemetryConstants;
+import com.microsoft.azuretools.telemetry.TelemetryProperties;
+import com.microsoft.azuretools.telemetrywrapper.EventUtil;
 import com.microsoft.tooling.msservices.components.DefaultLoader;
 import com.microsoft.tooling.msservices.serviceexplorer.AzureRefreshableNode;
 import com.microsoft.tooling.msservices.serviceexplorer.Node;
 import com.microsoft.tooling.msservices.serviceexplorer.azure.webapp.WebAppModule;
 
+import javax.annotation.Nonnull;
 import javax.swing.*;
-import java.util.Objects;
+import java.util.Collections;
+import java.util.Map;
 
-public class AppServiceUserFilesRootNode extends AzureRefreshableNode {
+public class AppServiceUserFilesRootNode extends AzureRefreshableNode implements TelemetryProperties {
     private static final String MODULE_ID = WebAppModule.class.getName();
     private static final String MODULE_NAME = "Files";
     private static final String ROOT_PATH = "/site/wwwroot";
 
+    protected IAppService appService;
     protected final String subscriptionId;
-    protected final WebAppBase app;
-    private AppServiceFileService fileService;
 
-    public AppServiceUserFilesRootNode(final Node parent, final String subscriptionId, final WebAppBase app) {
-        this(MODULE_NAME, parent, subscriptionId, app);
+    public AppServiceUserFilesRootNode(@Nonnull final Node parent, @Nonnull final String subscriptionId, @Nonnull final IAppService appService) {
+        this(MODULE_NAME, parent, subscriptionId, appService);
     }
 
-    public AppServiceUserFilesRootNode(final String name, final Node parent, final String subscriptionId, final WebAppBase app) {
+    public AppServiceUserFilesRootNode(@Nonnull final String name, @Nonnull final Node parent, @Nonnull final String subscriptionId,
+                                       @Nonnull final IAppService appService) {
         super(MODULE_ID, name, parent, null);
         this.subscriptionId = subscriptionId;
-        this.app = app;
+        this.appService = appService;
     }
 
     @Override
@@ -59,12 +48,14 @@ public class AppServiceUserFilesRootNode extends AzureRefreshableNode {
     }
 
     @Override
-    @AzureOperation(value = "reload (log)files of web app[%s]", params = {"@app.name()"}, type = AzureOperation.Type.ACTION)
+    @AzureOperation(name = "appservice|file.list", params = {"this.app.name()"}, type = AzureOperation.Type.ACTION)
     protected void refreshItems() {
-        final AppServiceFileService service = this.getFileService();
-        service.getFilesInDirectory(getRootPath()).stream()
-               .map(file -> new AppServiceFileNode(file, this, service))
-               .forEach(this::addChildNode);
+        EventUtil.executeWithLog(getServiceName(), TelemetryConstants.LIST_FILE, operation -> {
+            operation.trackProperty(TelemetryConstants.SUBSCRIPTIONID, subscriptionId);
+            appService.getFilesInDirectory(getRootPath()).stream()
+                    .map(file -> new AppServiceFileNode(file, this, appService))
+                    .forEach(this::addChildNode);
+        });
     }
 
     @NotNull
@@ -72,11 +63,14 @@ public class AppServiceUserFilesRootNode extends AzureRefreshableNode {
         return ROOT_PATH;
     }
 
-    public AppServiceFileService getFileService() {
-        if (Objects.isNull(this.fileService)) {
-            this.fileService = AppServiceFileService.forApp(app);
-        }
-        return this.fileService;
+    @Override
+    public String getServiceName() {
+        return appService instanceof IFunctionAppBase ? TelemetryConstants.FUNCTION : TelemetryConstants.WEBAPP;
+    }
+
+    @Override
+    public Map<String, String> toProperties() {
+        return Collections.singletonMap(AppInsightsConstants.SubscriptionId, subscriptionId);
     }
 
     @Override

@@ -1,23 +1,6 @@
 /*
- * Copyright (c) Microsoft Corporation
- *
- * All rights reserved.
- *
- * MIT License
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
- * documentation files (the "Software"), to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and
- * to permit persons to whom the Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all copies or substantial portions of
- * the Software.
- *
- * THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
- * THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Licensed under the MIT License. See License.txt in the project root for license information.
  */
 
 package com.microsoft.azure.hdinsight.sdk.rest;
@@ -43,44 +26,55 @@ public final class ObjectConvertUtils {
     private static ObjectMapper objectMapper = new ObjectMapper(jsonFactory);
     private static XmlMapper xmlMapper = new XmlMapper();
 
-    public static  <T> Optional<T> convertJsonToObject(@NotNull String jsonString, @NotNull Class<T> tClass) throws IOException {
-        return Optional.ofNullable(objectMapper.readValue(jsonString, tClass));
+    public static <T> Optional<T> convertJsonToObject(@NotNull String jsonString, @NotNull Class<T> clazz) throws IOException {
+        return Optional.ofNullable(objectMapper.readValue(jsonString, clazz));
     }
 
-    public static <T> T convertToObjectQuietly(@NotNull String jsonString, @NotNull Class<T> tClass) {
+    public static <T> T convertToObjectQuietly(@NotNull String jsonString, @NotNull Class<T> clazz) {
         try {
-            return objectMapper.readValue(jsonString, tClass);
+            return objectMapper.readValue(jsonString, clazz);
         } catch (IOException e) {
             // ignore the exception
         }
         return null;
     }
 
-    public static <T> Optional<T> convertEntityToObject(@NotNull HttpEntity entity, @NotNull Class<T> tClass) throws IOException {
-        final String type = entity.getContentType().getValue().toLowerCase();
+    public static <T> Optional<T> convertEntityToObject(@NotNull HttpEntity entity, @NotNull Class<T> clazz) throws IOException {
+        // To handle complex response Content-Type value.
+        // Ref to: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Type
+        // Like --
+        //   Content-Type: application/xml; charset=UTF-8
+        final String type = entity.getContentType().getValue().toLowerCase().split(";")[0].trim();
 
         switch (type) {
             case "application/json" :
-                return convertJsonToObject(EntityUtils.toString(entity), tClass);
+                return convertJsonToObject(EntityUtils.toString(entity), clazz);
             case "application/xml" :
-                return convertXmlToObject(EntityUtils.toString(entity), tClass);
+                return convertXmlToObject(EntityUtils.toString(entity), clazz);
+            default:
         }
         return Optional.empty();
     }
 
-    public static <T> Optional<List<T>> convertEntityToList(@NotNull HttpEntity entity, @NotNull Class<T> tClass) throws IOException {
-        final String type = entity.getContentType().getValue().toLowerCase();
+    public static <T> Optional<List<T>> convertEntityToList(@NotNull HttpEntity entity, @NotNull Class<T> clazz) throws IOException {
+        // To handle complex response Content-Type value.
+        // Ref to: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Type
+        // Like --
+        //   Content-Type: application/xml; charset=UTF-8
+        final String type = entity.getContentType().getValue().toLowerCase().split(";")[0].trim();
+
         switch (type) {
             case "application/json" :
-                return convertJsonToList(EntityUtils.toString(entity), tClass);
+                return convertJsonToList(EntityUtils.toString(entity), clazz);
             case "application/xml" :
-                return convertJsonToList(EntityUtils.toString(entity), tClass);
+                return convertXmlToList(EntityUtils.toString(entity), clazz);
+            default:
         }
         return Optional.empty();
     }
 
-    public static <T> Optional<List<T>> convertJsonToList(@NotNull String jsonString, Class<T> tClass) throws IOException {
-        List<T> myLists = objectMapper.readValue(jsonString, TypeFactory.defaultInstance().constructCollectionType(List.class, tClass));
+    public static <T> Optional<List<T>> convertJsonToList(@NotNull String jsonString, Class<T> clazz) throws IOException {
+        List<T> myLists = objectMapper.readValue(jsonString, TypeFactory.defaultInstance().constructCollectionType(List.class, clazz));
         return Optional.ofNullable(myLists);
     }
 
@@ -94,8 +88,8 @@ public final class ObjectConvertUtils {
         }
     }
 
-    public static <T> Optional<List<T>> convertXmlToList(@NotNull String jsonString, Class<T> tClass) throws IOException {
-        List<T> myLists = xmlMapper.readValue(jsonString, TypeFactory.defaultInstance().constructCollectionType(List.class, tClass));
+    public static <T> Optional<List<T>> convertXmlToList(@NotNull String jsonString, Class<T> clazz) throws IOException {
+        List<T> myLists = xmlMapper.readValue(jsonString, TypeFactory.defaultInstance().constructCollectionType(List.class, clazz));
         return Optional.ofNullable(myLists);
     }
 
@@ -117,7 +111,7 @@ public final class ObjectConvertUtils {
         return Optional.empty();
     }
 
-    public static <T> Optional<T> convertXmlToObject(@NotNull String xmlString, Class<T> tClass) throws IOException {
-        return Optional.ofNullable(xmlMapper.readValue(xmlString, tClass));
+    public static <T> Optional<T> convertXmlToObject(@NotNull String xmlString, Class<T> clazz) throws IOException {
+        return Optional.ofNullable(xmlMapper.readValue(xmlString, clazz));
     }
 }

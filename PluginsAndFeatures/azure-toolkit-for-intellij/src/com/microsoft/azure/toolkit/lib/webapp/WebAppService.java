@@ -1,39 +1,31 @@
 /*
- * Copyright (c) Microsoft Corporation
- *
- * All rights reserved.
- *
- * MIT License
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
- * documentation files (the "Software"), to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and
- * to permit persons to whom the Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all copies or substantial portions of
- * the Software.
- *
- * THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
- * THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Licensed under the MIT License. See License.txt in the project root for license information.
  */
 
 package com.microsoft.azure.toolkit.lib.webapp;
 
-import com.microsoft.azure.management.appservice.JavaVersion;
-import com.microsoft.azure.management.appservice.OperatingSystem;
-import com.microsoft.azure.management.appservice.WebApp;
-import com.microsoft.azure.toolkit.lib.appservice.Draft;
+import com.microsoft.azure.toolkit.intellij.common.Draft;
 import com.microsoft.azure.toolkit.lib.appservice.MonitorConfig;
+import com.microsoft.azure.toolkit.lib.appservice.model.DiagnosticConfig;
+import com.microsoft.azure.toolkit.lib.appservice.model.JavaVersion;
+import com.microsoft.azure.toolkit.lib.appservice.model.Runtime;
+import com.microsoft.azure.toolkit.lib.appservice.model.WebContainer;
+import com.microsoft.azure.toolkit.lib.appservice.service.IWebApp;
 import com.microsoft.azure.toolkit.lib.common.operation.AzureOperation;
 import com.microsoft.azuretools.core.mvp.model.webapp.AzureWebAppMvpModel;
 import com.microsoft.azuretools.core.mvp.model.webapp.WebAppSettingModel;
-import com.microsoft.azuretools.telemetrywrapper.*;
+import com.microsoft.azuretools.telemetrywrapper.ErrorType;
+import com.microsoft.azuretools.telemetrywrapper.EventUtil;
+import com.microsoft.azuretools.telemetrywrapper.Operation;
+import com.microsoft.azuretools.telemetrywrapper.TelemetryManager;
 import org.apache.commons.lang3.StringUtils;
 
+import javax.annotation.Nonnull;
 import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static com.microsoft.azuretools.telemetry.TelemetryConstants.CREATE_WEBAPP;
 import static com.microsoft.azuretools.telemetry.TelemetryConstants.WEBAPP;
@@ -45,24 +37,16 @@ public class WebAppService {
         return WebAppService.instance;
     }
 
-    @AzureOperation(
-        value = "create web app[%s, rg=%s] in subscription[%s]",
-        params = {
-            "$config.getName()",
-            "$config.getResourceGroup().name()",
-            "$config.getSubscription().displayName()"
-        },
-        type = AzureOperation.Type.SERVICE
-    )
-    public WebApp createWebApp(final WebAppConfig config) {
+    @AzureOperation(name = "webapp.create_detail", params = {"config.getName()"}, type = AzureOperation.Type.SERVICE)
+    public IWebApp createWebApp(final WebAppConfig config) {
         final WebAppSettingModel settings = convertConfig2Settings(config);
         settings.setCreatingNew(true);
         final Map<String, String> properties = settings.getTelemetryProperties(null);
         final Operation operation = TelemetryManager.createOperation(WEBAPP, CREATE_WEBAPP);
         try {
             operation.start();
-            EventUtil.logEvent(EventType.info, operation, properties);
-            return AzureWebAppMvpModel.getInstance().createWebApp(settings);
+            operation.trackProperties(properties);
+            return AzureWebAppMvpModel.getInstance().createWebAppFromSettingModel(settings);
         } catch (final RuntimeException e) {
             EventUtil.logError(operation, ErrorType.userError, e, properties, null);
             throw e;
@@ -72,43 +56,51 @@ public class WebAppService {
     }
 
     @AzureOperation(
-        value = "init web app configuration",
+        name = "webapp.init_config",
         type = AzureOperation.Type.TASK
     )
     public static WebAppSettingModel convertConfig2Settings(final WebAppConfig config) {
         final WebAppSettingModel settings = new WebAppSettingModel();
-        settings.setSubscriptionId(config.getSubscription().subscriptionId());
+        settings.setSubscriptionId(config.getSubscription().getId());
         // creating if id is empty
-        settings.setCreatingResGrp(config.getResourceGroup() instanceof Draft || StringUtils.isEmpty(config.getResourceGroup().id()));
-        settings.setResourceGroup(config.getResourceGroup().name());
+        settings.setCreatingResGrp(config.getResourceGroup() instanceof Draft || StringUtils.isEmpty(config.getResourceGroup().getId()));
+        settings.setResourceGroup(config.getResourceGroup().getName());
         settings.setWebAppName(config.getName());
-        settings.setOS(config.getPlatform().getOs());
-        settings.setRegion(config.getRegion().name());
-        if (settings.getOS() == OperatingSystem.LINUX) {
-            settings.setStack(config.getPlatform().getStackOrWebContainer());
-            settings.setVersion(config.getPlatform().getStackVersionOrJavaVersion());
-        } else if (settings.getOS() == OperatingSystem.WINDOWS) {
-            settings.setWebContainer(config.getPlatform().getStackOrWebContainer());
-            settings.setJdkVersion(JavaVersion.fromString(config.getPlatform().getStackVersionOrJavaVersion()));
-        }
+        settings.setRegion(config.getRegion().getName());
+        settings.saveRuntime(config.getRuntime());
         // creating if id is empty
-        settings.setCreatingAppServicePlan(config.getServicePlan() instanceof Draft || StringUtils.isEmpty(config.getServicePlan().id()));
+        settings.setCreatingAppServicePlan(config.getServicePlan() instanceof Draft || StringUtils.isEmpty(config.getServicePlan().getId()));
         if (settings.isCreatingAppServicePlan()) {
-            settings.setAppServicePlanName(config.getServicePlan().name());
+            settings.setAppServicePlanName(config.getServicePlan().getName());
         } else {
-            settings.setAppServicePlanId(config.getServicePlan().id());
+            settings.setAppServicePlanId(config.getServicePlan().getId());
         }
-        settings.setPricing(config.getServicePlan().pricingTier().toString());
+        settings.setPricing(config.getServicePlan().getPricingTier().getSize());
         final MonitorConfig monitorConfig = config.getMonitorConfig();
         if (monitorConfig != null) {
-            settings.setEnableApplicationLog(monitorConfig.isEnableApplicationLog());
-            settings.setApplicationLogLevel(monitorConfig.getApplicationLogLevel());
-            settings.setEnableWebServerLogging(monitorConfig.isEnableWebServerLogging());
-            settings.setWebServerLogQuota(monitorConfig.getWebServerLogQuota());
-            settings.setWebServerRetentionPeriod(monitorConfig.getWebServerRetentionPeriod());
-            settings.setEnableDetailedErrorMessage(monitorConfig.isEnableDetailedErrorMessage());
-            settings.setEnableFailedRequestTracing(monitorConfig.isEnableFailedRequestTracing());
+            final DiagnosticConfig diagnosticConfig = monitorConfig.getDiagnosticConfig();
+            settings.setEnableApplicationLog(diagnosticConfig.isEnableApplicationLog());
+            settings.setApplicationLogLevel(diagnosticConfig.getApplicationLogLevel() == null ? null :
+                    diagnosticConfig.getApplicationLogLevel().getValue());
+            settings.setEnableWebServerLogging(diagnosticConfig.isEnableWebServerLogging());
+            settings.setWebServerLogQuota(diagnosticConfig.getWebServerLogQuota());
+            settings.setWebServerRetentionPeriod(diagnosticConfig.getWebServerRetentionPeriod());
+            settings.setEnableDetailedErrorMessage(diagnosticConfig.isEnableDetailedErrorMessage());
+            settings.setEnableFailedRequestTracing(diagnosticConfig.isEnableFailedRequestTracing());
         }
+        settings.setTargetName(config.getApplication() == null ? null : config.getApplication().toFile().getName());
+        settings.setTargetPath(config.getApplication() == null ? null : config.getApplication().toString());
         return settings;
+    }
+
+    public String getRuntimeDisplayName(@Nonnull final Runtime runtime) {
+        final String os = runtime.getOperatingSystem().getValue();
+        final String javaVersion = Objects.equals(runtime.getJavaVersion(), JavaVersion.OFF) ?
+                null : String.format("Java %s", runtime.getJavaVersion().getValue());
+        final String webContainer = Objects.equals(runtime.getWebContainer(), WebContainer.JAVA_OFF) ?
+                null : runtime.getWebContainer().getValue();
+        return Stream.of(os, javaVersion, webContainer)
+                     .filter(StringUtils::isNotEmpty)
+                     .map(StringUtils::capitalize).collect(Collectors.joining("-"));
     }
 }

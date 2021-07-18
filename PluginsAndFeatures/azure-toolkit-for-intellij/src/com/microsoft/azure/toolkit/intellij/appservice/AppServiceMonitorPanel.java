@@ -1,23 +1,6 @@
 /*
- * Copyright (c) Microsoft Corporation
- *
- * All rights reserved.
- *
- * MIT License
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
- * documentation files (the "Software"), to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and
- * to permit persons to whom the Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all copies or substantial portions of
- * the Software.
- *
- * THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
- * THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Licensed under the MIT License. See License.txt in the project root for license information.
  */
 
 package com.microsoft.azure.toolkit.intellij.appservice;
@@ -29,6 +12,7 @@ import com.microsoft.azure.toolkit.intellij.common.AzureFormPanel;
 import com.microsoft.azure.toolkit.intellij.common.IntegerTextField;
 import com.microsoft.azure.toolkit.lib.appservice.ApplicationInsightsConfig;
 import com.microsoft.azure.toolkit.lib.appservice.MonitorConfig;
+import com.microsoft.azure.toolkit.lib.appservice.model.DiagnosticConfig;
 import com.microsoft.azure.toolkit.lib.common.form.AzureFormInput;
 
 import javax.swing.*;
@@ -107,18 +91,17 @@ public class AppServiceMonitorPanel extends JPanel implements AzureFormPanel<Mon
 
     @Override
     public MonitorConfig getData() {
-        MonitorConfig config = MonitorConfig.builder().build();
-        final ApplicationInsightsConfig insightsConfig =
-                (rdoEnableApplicationInsights.isSelected() && titleAppServiceLog.isVisible()) ? applicationInsightsComboBox.getValue() : null;
-        config.setApplicationInsightsConfig(insightsConfig);
-        config.setEnableWebServerLogging(rdoEnableWebServerLog.isSelected() && lblWebServerLog.isVisible());
-        config.setWebServerLogQuota(txtQuota.getValue());
-        config.setWebServerRetentionPeriod(txtRetention.getValue());
-        config.setEnableDetailedErrorMessage(rdoEnableDetailError.isSelected());
-        config.setEnableFailedRequestTracing(rdoEnableFailedRequest.isSelected());
-        config.setEnableApplicationLog(rdoEnableApplicationLog.isSelected() && lblApplicationLog.isVisible());
-        config.setApplicationLogLevel(cbLogLevel.getValue());
-        return config;
+        final ApplicationInsightsConfig insightsConfig = (rdoEnableApplicationInsights.isSelected() && titleApplicationInsights.isVisible()) ?
+                applicationInsightsComboBox.getValue() : null;
+        final DiagnosticConfig diagnosticConfig = DiagnosticConfig.builder()
+                .enableWebServerLogging(rdoEnableWebServerLog.isSelected() && lblWebServerLog.isVisible())
+                .webServerLogQuota(txtQuota.getValue())
+                .webServerRetentionPeriod(txtRetention.getValue())
+                .enableDetailedErrorMessage(rdoEnableDetailError.isSelected())
+                .enableFailedRequestTracing(rdoEnableFailedRequest.isSelected())
+                .enableApplicationLog(rdoEnableApplicationLog.isSelected() && lblApplicationLog.isVisible())
+                .applicationLogLevel(cbLogLevel.getValue()).build();
+        return MonitorConfig.builder().applicationInsightsConfig(insightsConfig).diagnosticConfig(diagnosticConfig).build();
     }
 
     @Override
@@ -133,16 +116,17 @@ public class AppServiceMonitorPanel extends JPanel implements AzureFormPanel<Mon
             }
         }
         if (titleAppServiceLog.isVisible()) {
+            final DiagnosticConfig diagnosticConfig = data.getDiagnosticConfig();
             if (lblWebServerLog.isVisible()) {
-                rdoEnableWebServerLog.setSelected(data.isEnableWebServerLogging());
-                txtQuota.setValue(data.getWebServerLogQuota());
-                txtRetention.setValue(data.getWebServerRetentionPeriod());
-                rdoEnableDetailError.setSelected(data.isEnableDetailedErrorMessage());
-                rdoEnableFailedRequest.setSelected(data.isEnableFailedRequestTracing());
+                rdoEnableWebServerLog.setSelected(diagnosticConfig.isEnableWebServerLogging());
+                txtQuota.setValue(diagnosticConfig.getWebServerLogQuota());
+                txtRetention.setValue(diagnosticConfig.getWebServerRetentionPeriod());
+                rdoEnableDetailError.setSelected(diagnosticConfig.isEnableDetailedErrorMessage());
+                rdoEnableFailedRequest.setSelected(diagnosticConfig.isEnableFailedRequestTracing());
             }
             if (lblApplicationInsights.isVisible()) {
-                rdoEnableApplicationLog.setSelected(data.isEnableApplicationLog());
-                cbLogLevel.setSelectedItem(data.getApplicationLogLevel());
+                rdoEnableApplicationLog.setSelected(diagnosticConfig.isEnableApplicationLog());
+                cbLogLevel.setSelectedItem(diagnosticConfig.getApplicationLogLevel());
             }
         }
         this.repaint();

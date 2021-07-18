@@ -1,41 +1,25 @@
 /*
- * Copyright (c) Microsoft Corporation
- *
- * All rights reserved.
- *
- * MIT License
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
- * documentation files (the "Software"), to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and
- * to permit persons to whom the Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all copies or substantial portions of
- * the Software.
- *
- * THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
- * THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Licensed under the MIT License. See License.txt in the project root for license information.
  */
 
 package com.microsoft.azure.toolkit.intellij.mysql.creation;
 
-import com.microsoft.azure.management.mysql.v2020_01_01.ServerVersion;
-import com.microsoft.azure.management.resources.ResourceGroup;
-import com.microsoft.azure.management.resources.Subscription;
 import com.microsoft.azure.toolkit.intellij.appservice.resourcegroup.ResourceGroupComboBox;
 import com.microsoft.azure.toolkit.intellij.appservice.subscription.SubscriptionComboBox;
 import com.microsoft.azure.toolkit.intellij.common.AzureFormPanel;
 import com.microsoft.azure.toolkit.intellij.common.AzurePasswordFieldInput;
 import com.microsoft.azure.toolkit.intellij.common.TextDocumentListenerAdapter;
-import com.microsoft.azure.toolkit.intellij.mysql.AdminUsernameTextField;
-import com.microsoft.azure.toolkit.intellij.mysql.ConnectionSecurityPanel;
-import com.microsoft.azure.toolkit.intellij.mysql.MySQLRegionComboBox;
-import com.microsoft.azure.toolkit.intellij.mysql.ServerNameTextField;
+import com.microsoft.azure.toolkit.intellij.database.AdminUsernameTextField;
+import com.microsoft.azure.toolkit.intellij.database.PasswordUtils;
+import com.microsoft.azure.toolkit.intellij.database.RegionComboBox;
+import com.microsoft.azure.toolkit.intellij.database.ServerNameTextField;
+import com.microsoft.azure.toolkit.intellij.database.ui.ConnectionSecurityPanel;
+import com.microsoft.azure.toolkit.intellij.mysql.MySQLRegionValidator;
 import com.microsoft.azure.toolkit.intellij.mysql.VersionComboBox;
+import com.microsoft.azure.toolkit.intellij.sqlserver.common.SqlServerNameValidator;
 import com.microsoft.azure.toolkit.lib.common.form.AzureFormInput;
+import com.microsoft.azure.toolkit.lib.common.model.Subscription;
 import com.microsoft.azure.toolkit.lib.mysql.AzureMySQLConfig;
 import lombok.Getter;
 import org.apache.commons.lang3.StringUtils;
@@ -57,7 +41,7 @@ public class MySQLCreationAdvancedPanel extends JPanel implements AzureFormPanel
     @Getter
     private ServerNameTextField serverNameTextField;
     @Getter
-    private MySQLRegionComboBox regionComboBox;
+    private RegionComboBox regionComboBox;
     @Getter
     private VersionComboBox versionComboBox;
     @Getter
@@ -70,7 +54,7 @@ public class MySQLCreationAdvancedPanel extends JPanel implements AzureFormPanel
     private AzurePasswordFieldInput passwordFieldInput;
     private AzurePasswordFieldInput confirmPasswordFieldInput;
 
-    private AzureMySQLConfig config;
+    private final AzureMySQLConfig config;
 
     MySQLCreationAdvancedPanel(AzureMySQLConfig config) {
         super();
@@ -84,11 +68,15 @@ public class MySQLCreationAdvancedPanel extends JPanel implements AzureFormPanel
     private void init() {
         passwordFieldInput = PasswordUtils.generatePasswordFieldInput(this.passwordField, this.adminUsernameTextField);
         confirmPasswordFieldInput = PasswordUtils.generateConfirmPasswordFieldInput(this.confirmPasswordField, this.passwordField);
+        regionComboBox.setValidateFunction(new MySQLRegionValidator());
+        serverNameTextField.setSubscriptionId(config.getSubscription().getId());
+        serverNameTextField.setMinLength(3);
+        serverNameTextField.setMaxLength(63);
+        serverNameTextField.setValidateFunction(new SqlServerNameValidator());
     }
 
     private void initListeners() {
         this.subscriptionComboBox.addItemListener(this::onSubscriptionChanged);
-        this.resourceGroupComboBox.addItemListener(this::onResourceGroupChanged);
         this.adminUsernameTextField.getDocument().addDocumentListener(generateAdminUsernameListener());
         this.security.getAllowAccessFromAzureServicesCheckBox().addItemListener(this::onSecurityAllowAccessFromAzureServicesCheckBoxChanged);
         this.security.getAllowAccessFromLocalMachineCheckBox().addItemListener(this::onSecurityAllowAccessFromLocalMachineCheckBoxChanged);
@@ -98,14 +86,8 @@ public class MySQLCreationAdvancedPanel extends JPanel implements AzureFormPanel
         if (e.getStateChange() == ItemEvent.SELECTED && e.getItem() instanceof Subscription) {
             final Subscription subscription = (Subscription) e.getItem();
             this.resourceGroupComboBox.setSubscription(subscription);
-            this.serverNameTextField.setSubscription(subscription);
-        }
-    }
-
-    private void onResourceGroupChanged(final ItemEvent e) {
-        if (e.getStateChange() == ItemEvent.SELECTED && e.getItem() instanceof ResourceGroup) {
-            final ResourceGroup resourceGroup = (ResourceGroup) e.getItem();
-            this.serverNameTextField.setResourceGroup(resourceGroup);
+            this.serverNameTextField.setSubscriptionId(subscription.getId());
+            this.regionComboBox.setSubscription(subscription);
         }
     }
 
@@ -144,7 +126,7 @@ public class MySQLCreationAdvancedPanel extends JPanel implements AzureFormPanel
         config.setResourceGroup(resourceGroupComboBox.getValue());
         config.setRegion(regionComboBox.getValue());
         if (StringUtils.isNotBlank(versionComboBox.getValue())) {
-            config.setVersion(ServerVersion.fromString(versionComboBox.getValue()));
+            config.setVersion(versionComboBox.getValue());
         }
         config.setAllowAccessFromAzureServices(security.getAllowAccessFromAzureServicesCheckBox().isSelected());
         config.setAllowAccessFromLocalMachine(security.getAllowAccessFromLocalMachineCheckBox().isSelected());
@@ -175,7 +157,7 @@ public class MySQLCreationAdvancedPanel extends JPanel implements AzureFormPanel
             regionComboBox.setValue(config.getRegion());
         }
         if (config.getVersion() != null) {
-            versionComboBox.setValue(config.getVersion().toString());
+            versionComboBox.setValue(config.getVersion());
         }
         security.getAllowAccessFromAzureServicesCheckBox().setSelected(config.isAllowAccessFromAzureServices());
         security.getAllowAccessFromLocalMachineCheckBox().setSelected(config.isAllowAccessFromLocalMachine());

@@ -1,32 +1,15 @@
 /*
- * Copyright (c) Microsoft Corporation
- *
- * All rights reserved.
- *
- * MIT License
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
- * documentation files (the "Software"), to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and
- * to permit persons to whom the Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all copies or substantial portions of
- * the Software.
- *
- * THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
- * THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Licensed under the MIT License. See License.txt in the project root for license information.
  */
 
 package com.microsoft.tooling.msservices.serviceexplorer.azure.mysql;
 
-import com.microsoft.azure.management.mysql.v2020_01_01.Server;
-import com.microsoft.azuretools.azurecommons.helpers.AzureCmdException;
+import com.microsoft.azure.toolkit.lib.Azure;
+import com.microsoft.azure.toolkit.lib.common.event.AzureEventBus;
+import com.microsoft.azure.toolkit.lib.mysql.service.AzureMySql;
+import com.microsoft.azure.toolkit.lib.mysql.service.MySqlServer;
 import com.microsoft.azuretools.azurecommons.helpers.Nullable;
-import com.microsoft.azuretools.core.mvp.model.AzureMvpModel;
-import com.microsoft.azuretools.core.mvp.model.mysql.MySQLMvpModel;
 import com.microsoft.azuretools.utils.AzureUIRefreshCore;
 import com.microsoft.azuretools.utils.AzureUIRefreshListener;
 import com.microsoft.tooling.msservices.serviceexplorer.AzureIconSymbol;
@@ -34,6 +17,7 @@ import com.microsoft.tooling.msservices.serviceexplorer.AzureRefreshableNode;
 import com.microsoft.tooling.msservices.serviceexplorer.Node;
 
 import java.util.List;
+import java.util.Optional;
 
 public class MySQLModule extends AzureRefreshableNode implements MySQLModuleView {
 
@@ -43,12 +27,18 @@ public class MySQLModule extends AzureRefreshableNode implements MySQLModuleView
     public MySQLModule(final Node parent) {
         super(MYSQL_DATABASE_MODULE_ID, MODULE_NAME, parent);
         createListener();
+
+        AzureEventBus.after("mysql|server.create", this::onMySqlServerCreatedOrRemoved);
+        AzureEventBus.after("mysql|server.delete", this::onMySqlServerCreatedOrRemoved);
     }
 
-    public void renderChildren(List<Server> servers) {
-        for (final Server server : servers) {
-            final String sid = AzureMvpModel.getSegment(server.id(), "subscriptions");
-            final MySQLNode node = new MySQLNode(this, sid, server);
+    private void onMySqlServerCreatedOrRemoved(MySqlServer server) {
+        refreshItems();
+    }
+
+    public void renderChildren(List<MySqlServer> servers) {
+        for (final MySqlServer server : servers) {
+            final MySQLNode node = new MySQLNode(this, server);
             addChildNode(node);
         }
     }
@@ -59,14 +49,15 @@ public class MySQLModule extends AzureRefreshableNode implements MySQLModuleView
     }
 
     @Override
-    protected void refreshItems() throws AzureCmdException {
-        List<Server> items = MySQLMvpModel.listMySQLServers();
-        this.renderChildren(items);
+    protected void refreshItems() {
+        final List<MySqlServer> server = Azure.az(AzureMySql.class).list();
+        this.removeAllChildNodes();
+        this.renderChildren(server);
     }
 
     @Override
     public void removeNode(String sid, String id, Node node) {
-        MySQLMvpModel.delete(sid, id);
+        Optional.ofNullable(Azure.az(AzureMySql.class).subscription(sid).get(id)).ifPresent(MySqlServer::delete);
         removeDirectChildNode(node);
     }
 
@@ -99,8 +90,7 @@ public class MySQLModule extends AzureRefreshableNode implements MySQLModuleView
     }
 
     private boolean isMySQLModuleEvent(Object eventObject) {
-        return eventObject != null && eventObject instanceof Server;
+        return eventObject != null && eventObject instanceof MySqlServer;
     }
 
 }
-

@@ -1,30 +1,18 @@
 /*
- * Copyright (c) Microsoft Corporation
- *
- * All rights reserved.
- *
- * MIT License
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
- * documentation files (the "Software"), to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and
- * to permit persons to whom the Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all copies or substantial portions of
- * the Software.
- *
- * THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
- * THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Licensed under the MIT License. See License.txt in the project root for license information.
  */
 
 package com.microsoft.azure.toolkit.intellij.webapp.docker.webapponlinux;
 
 import com.intellij.execution.process.ProcessOutputTypes;
 import com.intellij.openapi.project.Project;
-import com.microsoft.azure.management.appservice.WebApp;
+import com.microsoft.azure.toolkit.intellij.common.AzureRunProfileState;
+import com.microsoft.azure.toolkit.intellij.webapp.docker.utils.Constant;
+import com.microsoft.azure.toolkit.intellij.webapp.docker.utils.DockerProgressHandler;
+import com.microsoft.azure.toolkit.intellij.webapp.docker.utils.DockerUtil;
+import com.microsoft.azure.toolkit.lib.appservice.service.IAppService;
+import com.microsoft.azure.toolkit.lib.appservice.service.IWebApp;
 import com.microsoft.azure.toolkit.lib.common.operation.AzureOperation;
 import com.microsoft.azuretools.core.mvp.model.webapp.AzureWebAppMvpModel;
 import com.microsoft.azuretools.core.mvp.model.webapp.PrivateRegistryImageSetting;
@@ -34,24 +22,20 @@ import com.microsoft.azuretools.telemetrywrapper.Operation;
 import com.microsoft.azuretools.telemetrywrapper.TelemetryManager;
 import com.microsoft.azuretools.utils.AzureUIRefreshCore;
 import com.microsoft.azuretools.utils.AzureUIRefreshEvent;
-import com.microsoft.azure.toolkit.intellij.common.AzureRunProfileState;
 import com.microsoft.intellij.RunProcessHandler;
-import com.microsoft.azure.toolkit.intellij.webapp.docker.utils.Constant;
-import com.microsoft.azure.toolkit.intellij.webapp.docker.utils.DockerProgressHandler;
-import com.microsoft.azure.toolkit.intellij.webapp.docker.utils.DockerUtil;
 import com.microsoft.intellij.util.MavenRunTaskUtil;
 import com.spotify.docker.client.DefaultDockerClient;
 import com.spotify.docker.client.DockerClient;
-
 import org.jetbrains.annotations.NotNull;
 
 import java.io.FileNotFoundException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.HashMap;
 import java.util.Map;
 
-public class WebAppOnLinuxDeployState extends AzureRunProfileState<WebApp> {
+public class WebAppOnLinuxDeployState extends AzureRunProfileState<IAppService> {
     private final WebAppOnLinuxDeployModel deployModel;
 
     public WebAppOnLinuxDeployState(Project project, WebAppOnLinuxDeployModel webAppOnLinuxDeployModel) {
@@ -60,26 +44,20 @@ public class WebAppOnLinuxDeployState extends AzureRunProfileState<WebApp> {
     }
 
     @Override
-    protected String getDeployTarget() {
-        return "Web App for Containers";
-    }
-
-    @Override
-    @AzureOperation(value = "deploy docker image to web app", type = AzureOperation.Type.ACTION)
-    public WebApp executeSteps(@NotNull RunProcessHandler processHandler,
-                               @NotNull Map<String, String> telemetryMap) throws Exception {
+    @AzureOperation(name = "docker.deploy_image.state", type = AzureOperation.Type.ACTION)
+    public IAppService executeSteps(@NotNull RunProcessHandler processHandler, @NotNull Operation operation) throws Exception {
         processHandler.setText("Starting job ...  ");
-        String basePath = project.getBasePath();
+        final String basePath = project.getBasePath();
         if (basePath == null) {
             processHandler.println("Project base path is null.", ProcessOutputTypes.STDERR);
             throw new FileNotFoundException("Project base path is null.");
         }
         // locate artifact to specified location
-        String targetFilePath = deployModel.getTargetPath();
+        final String targetFilePath = deployModel.getTargetPath();
         processHandler.setText(String.format("Locating artifact ... [%s]", targetFilePath));
 
         // validate dockerfile
-        Path targetDockerfile = Paths.get(deployModel.getDockerFilePath());
+        final Path targetDockerfile = Paths.get(deployModel.getDockerFilePath());
         processHandler.setText(String.format("Validating dockerfile ... [%s]", targetDockerfile));
         if (!targetDockerfile.toFile().exists()) {
             throw new FileNotFoundException("Dockerfile not found.");
@@ -92,10 +70,10 @@ public class WebAppOnLinuxDeployState extends AzureRunProfileState<WebApp> {
         Files.write(targetDockerfile, content.getBytes());
 
         // build image
-        PrivateRegistryImageSetting acrInfo = deployModel.getPrivateRegistryImageSetting();
+        final PrivateRegistryImageSetting acrInfo = deployModel.getPrivateRegistryImageSetting();
         processHandler.setText(String.format("Building image ...  [%s]",
                 acrInfo.getImageTagWithServerUrl()));
-        DockerClient docker = DefaultDockerClient.fromEnv().build();
+        final DockerClient docker = DefaultDockerClient.fromEnv().build();
         DockerUtil.ping(docker);
         DockerUtil.buildImage(docker,
                 acrInfo.getImageTagWithServerUrl(),
@@ -112,27 +90,25 @@ public class WebAppOnLinuxDeployState extends AzureRunProfileState<WebApp> {
         // deploy
         if (deployModel.isCreatingNewWebAppOnLinux()) {
             // create new WebApp
-            processHandler.setText(String.format("Creating new WebApp ... [%s]",
-                    deployModel.getWebAppName()));
-            WebApp app = AzureWebAppMvpModel.getInstance().createWebAppWithPrivateRegistryImage(deployModel);
+            processHandler.setText(String.format("Creating new WebApp ... [%s]", deployModel.getWebAppName()));
+            final IWebApp app = AzureWebAppMvpModel.getInstance().createAzureWebAppWithPrivateRegistryImage(deployModel);
             if (app != null && app.name() != null) {
                 processHandler.setText(String.format("URL:  http://%s.azurewebsites.net/", app.name()));
                 updateConfigurationDataModel(app);
 
-                AzureUIRefreshCore.execute(new AzureUIRefreshEvent(AzureUIRefreshEvent.EventType.REFRESH,
-                        null));
+                AzureUIRefreshCore.execute(new AzureUIRefreshEvent(AzureUIRefreshEvent.EventType.REFRESH, null));
             }
+            return app;
         } else {
             // update WebApp
             processHandler.setText(String.format("Updating WebApp ... [%s]",
                     deployModel.getWebAppName()));
-            WebApp app = AzureWebAppMvpModel.getInstance()
-                    .updateWebAppOnDocker(deployModel.getSubscriptionId(), deployModel.getWebAppId(), acrInfo);
+            final IWebApp app = AzureWebAppMvpModel.getInstance().updateWebAppOnDocker(deployModel.getWebAppId(), acrInfo);
             if (app != null && app.name() != null) {
                 processHandler.setText(String.format("URL:  http://%s.azurewebsites.net/", app.name()));
             }
+            return app;
         }
-        return null;
     }
 
     @Override
@@ -142,22 +118,19 @@ public class WebAppOnLinuxDeployState extends AzureRunProfileState<WebApp> {
 
     @Override
     @AzureOperation(
-        value = "complete the deployment of web app[%s] and refresh Azure Explorer",
-        params = {"@deployModel.getWebAppName()"},
+        name = "webapp.complete_deployment.state",
+        params = {"this.deployModel.getWebAppName()"},
         type = AzureOperation.Type.TASK
     )
-    protected void onSuccess(WebApp result, @NotNull RunProcessHandler processHandler) {
-        processHandler.setText("Updating cache ... ");
-        AzureWebAppMvpModel.getInstance().listAllWebAppsOnLinux(true);
-        processHandler.setText("Job done");
+    protected void onSuccess(IAppService result, @NotNull RunProcessHandler processHandler) {
         processHandler.notifyComplete();
         if (deployModel.isCreatingNewWebAppOnLinux() && AzureUIRefreshCore.listeners != null) {
-            AzureUIRefreshCore.execute(new AzureUIRefreshEvent(AzureUIRefreshEvent.EventType.REFRESH, null));
+            AzureUIRefreshCore.execute(new AzureUIRefreshEvent(AzureUIRefreshEvent.EventType.REFRESH, result));
         }
     }
 
-    @Override
-    protected void updateTelemetryMap(@NotNull Map<String, String> telemetryMap) {
+    protected Map<String, String> getTelemetryMap() {
+        final Map<String, String> telemetryMap = new HashMap<>();
         telemetryMap.put("SubscriptionId", deployModel.getSubscriptionId());
         telemetryMap.put("CreateNewApp", String.valueOf(deployModel.isCreatingNewWebAppOnLinux()));
         telemetryMap.put("CreateNewSP", String.valueOf(deployModel.isCreatingNewAppServicePlan()));
@@ -167,11 +140,12 @@ public class WebAppOnLinuxDeployState extends AzureRunProfileState<WebApp> {
             fileType = MavenRunTaskUtil.getFileType(deployModel.getTargetName());
         }
         telemetryMap.put("FileType", fileType);
+        return telemetryMap;
     }
 
-    private void updateConfigurationDataModel(WebApp app) {
+    private void updateConfigurationDataModel(IWebApp app) {
         deployModel.setCreatingNewWebAppOnLinux(false);
         deployModel.setWebAppId(app.id());
-        deployModel.setResourceGroupName(app.resourceGroupName());
+        deployModel.setResourceGroupName(app.entity().getResourceGroup());
     }
 }

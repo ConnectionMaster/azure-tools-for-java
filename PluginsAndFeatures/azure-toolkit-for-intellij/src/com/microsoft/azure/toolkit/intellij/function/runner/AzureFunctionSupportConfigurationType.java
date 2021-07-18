@@ -1,23 +1,6 @@
 /*
- * Copyright (c) Microsoft Corporation
- *
- * All rights reserved.
- *
- * MIT License
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
- * documentation files (the "Software"), to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and
- * to permit persons to whom the Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all copies or substantial portions of
- * the Software.
- *
- * THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
- * THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Licensed under the MIT License. See License.txt in the project root for license information.
  */
 
 package com.microsoft.azure.toolkit.intellij.function.runner;
@@ -28,15 +11,12 @@ import com.intellij.execution.configurations.ConfigurationTypeUtil;
 import com.intellij.icons.AllIcons;
 import com.microsoft.azure.toolkit.intellij.function.runner.deploy.FunctionDeploymentConfigurationFactory;
 import com.microsoft.azure.toolkit.intellij.function.runner.localrun.FunctionRunConfigurationFactory;
-import com.microsoft.intellij.util.PluginUtil;
+import com.microsoft.intellij.helpers.AzureIconLoader;
+import com.microsoft.tooling.msservices.serviceexplorer.AzureIconSymbol;
 
 import javax.swing.*;
 
-import static com.microsoft.azure.toolkit.intellij.function.runner.AzureFunctionsConstants.AZURE_FUNCTIONS_ICON;
-
 public class AzureFunctionSupportConfigurationType extends ConfigurationTypeBase implements ConfigurationType {
-
-    public static final String ICON_PATH = "/icons/" + AZURE_FUNCTIONS_ICON;
 
     protected AzureFunctionSupportConfigurationType() {
         super("AZURE_FUNCTION_SUPPORT", AzureFunctionsConstants.DISPLAY_NAME, "Execute the azure functions", AllIcons.Actions.Execute);
@@ -55,6 +35,6 @@ public class AzureFunctionSupportConfigurationType extends ConfigurationTypeBase
 
     @Override
     public Icon getIcon() {
-        return PluginUtil.getIcon(ICON_PATH);
+        return AzureIconLoader.loadIcon(AzureIconSymbol.FunctionApp.MODULE);
     }
 }

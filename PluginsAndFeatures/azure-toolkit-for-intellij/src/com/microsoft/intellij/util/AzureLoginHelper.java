@@ -1,30 +1,13 @@
 /*
- * Copyright (c) Microsoft Corporation
- *
- * All rights reserved.
- *
- * MIT License
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
- * documentation files (the "Software"), to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and
- * to permit persons to whom the Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all copies or substantial portions of
- * the Software.
- *
- * THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
- * THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Licensed under the MIT License. See License.txt in the project root for license information.
  */
 package com.microsoft.intellij.util;
 
-import com.microsoft.azure.common.exceptions.AzureExecutionException;
+import com.microsoft.azure.toolkit.lib.common.exception.AzureExecutionException;
+import com.microsoft.azure.toolkit.lib.common.model.Subscription;
 import com.microsoft.azuretools.authmanage.AuthMethodManager;
-import com.microsoft.azuretools.authmanage.models.SubscriptionDetail;
-import com.microsoft.azuretools.sdkmanage.AzureManager;
+import com.microsoft.azuretools.sdkmanage.IdentityAzureManager;
 import org.apache.commons.collections.CollectionUtils;
 
 import java.util.List;
@@ -41,13 +24,12 @@ public class AzureLoginHelper {
         if (!AuthMethodManager.getInstance().isSignedIn()) {
             throw new AzureExecutionException(NEED_SIGN_IN);
         }
-        final AzureManager azureManager = AuthMethodManager.getInstance().getAzureManager();
-        final List<SubscriptionDetail> subscriptions = azureManager.getSubscriptionManager().getSubscriptionDetails();
+        IdentityAzureManager azureManager = IdentityAzureManager.getInstance();
+        final List<Subscription> subscriptions = azureManager.getSubscriptions();
         if (CollectionUtils.isEmpty(subscriptions)) {
             throw new AzureExecutionException(NO_SUBSCRIPTION);
         }
-        final List<SubscriptionDetail> selectedSubscriptions =
-            azureManager.getSubscriptionManager().getSelectedSubscriptionDetails();
+        final List<Subscription> selectedSubscriptions = azureManager.getSelectedSubscriptions();
         if (CollectionUtils.isEmpty(selectedSubscriptions)) {
             throw new AzureExecutionException(MUST_SELECT_SUBSCRIPTION);
         }

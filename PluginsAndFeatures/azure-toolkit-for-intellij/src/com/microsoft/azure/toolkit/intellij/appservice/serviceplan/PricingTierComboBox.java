@@ -1,58 +1,44 @@
 /*
- * Copyright (c) Microsoft Corporation
- *
- * All rights reserved.
- *
- * MIT License
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
- * documentation files (the "Software"), to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and
- * to permit persons to whom the Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all copies or substantial portions of
- * the Software.
- *
- * THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
- * THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Licensed under the MIT License. See License.txt in the project root for license information.
  */
 
 package com.microsoft.azure.toolkit.intellij.appservice.serviceplan;
 
-import com.microsoft.azure.management.appservice.PricingTier;
+import com.microsoft.azure.toolkit.lib.appservice.model.PricingTier;
 import com.microsoft.azure.toolkit.intellij.common.AzureComboBox;
 import com.microsoft.azuretools.azurecommons.helpers.NotNull;
-import com.microsoft.azuretools.core.mvp.model.function.AzureFunctionMvpModel;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 
 import static com.microsoft.intellij.ui.messages.AzureBundle.message;
 
 public class PricingTierComboBox extends AzureComboBox<PricingTier> {
 
-    private PricingTier defaultPricingTier = PricingTier.BASIC_B2;
-    private List<PricingTier> pricingTierList = Collections.EMPTY_LIST;
+    private List<? extends PricingTier> pricingTierList = Collections.emptyList();
 
     public PricingTierComboBox() {
         super();
     }
 
     public void setDefaultPricingTier(final PricingTier defaultPricingTier) {
-        this.defaultPricingTier = defaultPricingTier;
         setValue(defaultPricingTier);
     }
 
-    public void setPricingTierList(final List<PricingTier> pricingTierList) {
+    public void setPricingTierList(final List<? extends PricingTier> pricingTierList) {
         this.pricingTierList = pricingTierList;
     }
 
     @Override
     protected String getItemText(final Object item) {
-        return item == AzureFunctionMvpModel.CONSUMPTION_PRICING_TIER ? message("appService.pricingTier.consumption") : super.getItemText(item);
+        if (Objects.isNull(item)) {
+            return EMPTY_ITEM;
+        }
+        final PricingTier pricingTier = (PricingTier) item;
+        return Objects.equals(pricingTier, PricingTier.CONSUMPTION) ?
+                message("appService.pricingTier.consumption") : pricingTier.getTier() + "_" + pricingTier.getSize();
     }
 
     @NotNull

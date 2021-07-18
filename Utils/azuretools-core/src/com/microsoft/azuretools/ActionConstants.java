@@ -1,23 +1,6 @@
 /*
- * Copyright (c) Microsoft Corporation
- *
- * All rights reserved.
- *
- * MIT License
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
- * documentation files (the "Software"), to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and
- * to permit persons to whom the Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all copies or substantial portions of
- * the Software.
- *
- * THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
- * THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Licensed under the MIT License. See License.txt in the project root for license information.
  */
 
 package com.microsoft.azuretools;
@@ -113,10 +96,32 @@ public final class ActionConstants {
         String START = OPERATION_PREFIX + "start";
         String STOP = OPERATION_PREFIX + "stop";
         String RESTART = OPERATION_PREFIX + "restart";
+        String SAVE = OPERATION_PREFIX + "save";
         String OPEN_IN_PORTAL = OPERATION_PREFIX + "open-in-portal";
         String SHOW_PROPERTIES = OPERATION_PREFIX + "show-properties";
         String CONNECT_TO_SERVER = OPERATION_PREFIX + "connect-to-server";
         String BIND_INTO = OPERATION_PREFIX + "bind-into";
+        String LINK_TO_MODULE = OPERATION_PREFIX + "link-to-module";
+        String DO_SERVICE_LINK = OPERATION_PREFIX + "link";
+        String TEST_CONNECTION = OPERATION_PREFIX + "test-connection";
+        String UPDATE_PASSWORD = OPERATION_PREFIX + "update-password";
+    }
+
+    public interface SqlServer {
+        String MODULE = "sql-server";
+        String OPERATION_PREFIX = MODULE + SEPARATOR + MODULE + OPERATION_SEPARATOR;
+
+        String CREATE = OPERATION_PREFIX + "create";
+        String DELETE = OPERATION_PREFIX + "delete";
+        String SAVE = OPERATION_PREFIX + "save";
+        String OPEN_IN_PORTAL = OPERATION_PREFIX + "open-in-portal";
+        String SHOW_PROPERTIES = OPERATION_PREFIX + "show-properties";
+        String CONNECT_TO_SERVER = OPERATION_PREFIX + "connect-to-server";
+        String BIND_INTO = OPERATION_PREFIX + "bind-into";
+        String LINK_TO_MODULE = OPERATION_PREFIX + "link-to-module";
+        String DO_SERVICE_LINK = OPERATION_PREFIX + "link";
+        String TEST_CONNECTION = OPERATION_PREFIX + "test-connection";
+        String UPDATE_PASSWORD = OPERATION_PREFIX + "update-password";
     }
 
     public interface SpringCloud {
@@ -184,6 +189,16 @@ public final class ActionConstants {
         interface Deployment {
             String DELETE = OPERATION_PREFIX + "deployment-delete";
         }
+    }
+
+    public interface ContainerRegister {
+        String MODULE = "acr";
+        String OPERATION_PREFIX = MODULE + SEPARATOR;
+
+        String PUSHIMAGE = OPERATION_PREFIX + "pushimage-acr";
+        String OPEN_IN_PORTAL = OPERATION_PREFIX + "open-inbrowser-acr";
+        String SHOW_PROPERTIES = OPERATION_PREFIX + "open-explorer-acr";
+
     }
 
     @AllArgsConstructor

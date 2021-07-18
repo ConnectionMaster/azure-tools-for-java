@@ -1,23 +1,6 @@
 /*
- * Copyright (c) Microsoft Corporation
- *
- * All rights reserved.
- *
- * MIT License
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
- * documentation files (the "Software"), to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and
- * to permit persons to whom the Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all copies or substantial portions of
- * the Software.
- *
- * THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
- * THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Licensed under the MIT License. See License.txt in the project root for license information.
  */
 
 package com.microsoft.azuretools.utils;
@@ -38,7 +21,9 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Function;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -120,7 +105,7 @@ public class CommandUtils {
         executor.setExitValues(null);
         try {
             executor.execute(commandLine);
-            if (!mergeErrorStream) {
+            if (!mergeErrorStream && err.size() > 0) {
                 logger.log(Level.SEVERE, err.toString());
             }
             return out.toString();
@@ -133,17 +118,19 @@ public class CommandUtils {
         }
     }
 
-    public static OutputStream executeCommandAndGetOutputStream(final String command, final String[] parameters) throws IOException {
-        CommandExecutionOutput execution = executeCommandAndGetExecution(command, parameters);
+    public static OutputStream executeCommandAndGetOutputStream(final String command, final String[] parameters, Map<String, String> env) throws IOException {
+        CommandExecutionOutput execution = executeCommandAndGetExecution(command, parameters, env);
         return execution.getOutputStream();
     }
 
-    public static DefaultExecuteResultHandler executeCommandAndGetResultHandler(final String command, final String[] parameters) throws IOException {
-        CommandExecutionOutput execution = executeCommandAndGetExecution(command, parameters);
+    public static DefaultExecuteResultHandler executeCommandAndGetResultHandler(final String command, final String[] parameters, Map<String, String> env)
+        throws IOException {
+        CommandExecutionOutput execution = executeCommandAndGetExecution(command, parameters, env);
         return execution.getResultHandler();
     }
 
-    public static CommandExecutionOutput executeCommandAndGetExecution(final String command, final String[] parameters) throws IOException {
+    public static CommandExecutionOutput executeCommandAndGetExecution(final String command, final String[] parameters, Map<String, String> env)
+        throws IOException {
         final String starter = isWindows() ? WINDOWS_STARTER : LINUX_MAC_STARTER;
         final String switcher = isWindows() ? WINDOWS_SWITCHER : LINUX_MAC_SWITCHER;
         final CommandLine commandLine = new CommandLine(starter);
@@ -156,7 +143,9 @@ public class CommandUtils {
         final DefaultExecutor executor = new DefaultExecutor();
         executor.setStreamHandler(streamHandler);
         executor.setExitValues(null);
-        executor.execute(commandLine, resultHandler);
+        Map<String, String> newEnv = new HashMap<>(System.getenv());
+        env.forEach(newEnv::put);
+        executor.execute(commandLine, newEnv, resultHandler);
         CommandExecutionOutput execution = new CommandExecutionOutput();
         execution.setOutputStream(outputStream);
         execution.setErrorStream(errorStream);

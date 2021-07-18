@@ -141,7 +141,6 @@ function getBasicInfoFromUrl() {
 
     spark.sourceType = spark.queriresMap['sourcetype'] === undefined ? "intellij" : "eclipse";
     spark.clusterName = spark.queriresMap['clusterName'];
-    spark.engineType = spark.queriresMap['engineType'];
     spark.queryPort = spark.queriresMap['port'];
     spark.localhost = 'http://localhost:{0}'.format(spark.queryPort);
 

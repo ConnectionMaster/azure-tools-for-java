@@ -1,44 +1,27 @@
 /*
- * Copyright (c) Microsoft Corporation
- *
- * All rights reserved.
- *
- * MIT License
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
- * documentation files (the "Software"), to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and
- * to permit persons to whom the Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all copies or substantial portions of
- * the Software.
- *
- * THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
- * THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Licensed under the MIT License. See License.txt in the project root for license information.
  */
 
 package com.microsoft.azure.toolkit.intellij.common;
 
 import com.intellij.execution.configurations.RunConfiguration;
+import com.intellij.execution.impl.ConfigurationSettingsEditorWrapper;
+import com.intellij.ide.DataManager;
+import com.intellij.openapi.actionSystem.DataContext;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Comparing;
 import com.intellij.packaging.artifacts.Artifact;
 import com.intellij.packaging.impl.run.BuildArtifactsBeforeRunTaskProvider;
 import com.intellij.ui.SimpleListCellRenderer;
+import com.microsoft.azure.toolkit.intellij.function.runner.core.FunctionUtils;
+import com.microsoft.azure.toolkit.intellij.springcloud.deplolyment.SpringCloudDeploymentConfiguration;
 import com.microsoft.azuretools.securestore.SecureStore;
 import com.microsoft.azuretools.service.ServiceManager;
 import com.microsoft.azuretools.telemetry.AppInsightsClient;
-import com.microsoft.azure.toolkit.intellij.function.runner.core.FunctionUtils;
-import com.microsoft.azure.toolkit.intellij.springcloud.runner.deploy.SpringCloudDeployConfiguration;
-import com.microsoft.intellij.ui.components.AzureArtifact;
-import com.microsoft.intellij.ui.components.AzureArtifactManager;
 import com.microsoft.intellij.util.BeforeRunTaskUtils;
 import com.microsoft.intellij.util.MavenRunTaskUtil;
 import com.microsoft.intellij.util.MavenUtils;
-import com.microsoft.intellij.util.PluginUtil;
 import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.idea.maven.project.MavenProject;
@@ -176,29 +159,21 @@ public abstract class AzureSettingPanel<T extends AzureRunConfigurationBase> {
         }
     }
 
-    protected void syncBeforeRunTasks(AzureArtifact azureArtifact,
-                                               @NotNull final RunConfiguration configuration) {
-        if (!AzureArtifactManager.getInstance(configuration.getProject())
-                                 .equalsAzureArtifactIdentifier(lastSelectedAzureArtifact, azureArtifact)) {
-            JPanel pnlRoot = getMainPanel();
+    protected void syncBeforeRunTasks(AzureArtifact azureArtifact, @NotNull final RunConfiguration configuration) {
+        if (!AzureArtifactManager.getInstance(configuration.getProject()).equalsAzureArtifact(lastSelectedAzureArtifact, azureArtifact)) {
+            final JPanel pnlRoot = getMainPanel();
+            final DataContext context = DataManager.getInstance().getDataContext(pnlRoot);
+            final ConfigurationSettingsEditorWrapper editor = ConfigurationSettingsEditorWrapper.CONFIGURATION_EDITOR_KEY.getData(context);
+            if (editor == null) {
+                return;
+            }
             if (Objects.nonNull(lastSelectedAzureArtifact)) {
-                try {
-                    BeforeRunTaskUtils.addOrRemoveBeforeRunTask(pnlRoot, lastSelectedAzureArtifact, configuration,
-                                                                false);
-                } catch (IllegalAccessException e) {
-                    PluginUtil.showErrorNotificationProject(configuration.getProject(), "Remove Before Run Task error",
-                                                            e.getMessage());
-                }
+                BeforeRunTaskUtils.removeBeforeRunTask(editor, lastSelectedAzureArtifact);
             }
 
             lastSelectedAzureArtifact = azureArtifact;
-            if (Objects.nonNull(lastSelectedAzureArtifact)) {
-                try {
-                    BeforeRunTaskUtils.addOrRemoveBeforeRunTask(pnlRoot, lastSelectedAzureArtifact, configuration, true);
-                } catch (IllegalAccessException e) {
-                    PluginUtil.showErrorNotificationProject(configuration.getProject(), "Add Before Run Task error",
-                                                            e.getMessage());
-                }
+            if (Objects.nonNull(azureArtifact)) {
+                BeforeRunTaskUtils.addBeforeRunTask(editor, azureArtifact, configuration);
             }
         }
     }
@@ -244,7 +219,7 @@ public abstract class AzureSettingPanel<T extends AzureRunConfigurationBase> {
             return;
         }
         List<AzureArtifact> azureArtifacts =
-                configuration instanceof SpringCloudDeployConfiguration ?
+                configuration instanceof SpringCloudDeploymentConfiguration ?
                 AzureArtifactManager.getInstance(project).getSupportedAzureArtifactsForSpringCloud() :
                 AzureArtifactManager.getInstance(project).getAllSupportedAzureArtifacts();
         getCbAzureArtifact().removeAllItems();

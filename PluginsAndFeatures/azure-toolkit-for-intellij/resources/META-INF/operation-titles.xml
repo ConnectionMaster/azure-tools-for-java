@@ -1,0 +1,23 @@
+<idea-plugin>
+  <resource-bundle>com.microsoft.azure.toolkit.operation.titles_appservice</resource-bundle>
+  <resource-bundle>com.microsoft.azure.toolkit.operation.titles_springcloud</resource-bundle>
+
+  <resource-bundle>com.microsoft.azure.toolkit.operation.titles_account_intellij</resource-bundle>
+  <resource-bundle>com.microsoft.azure.toolkit.operation.titles_ai_intellij</resource-bundle>
+  <resource-bundle>com.microsoft.azure.toolkit.operation.titles_appservice_intellij</resource-bundle>
+  <resource-bundle>com.microsoft.azure.toolkit.operation.titles_arm_intellij</resource-bundle>
+  <resource-bundle>com.microsoft.azure.toolkit.operation.titles_blob_intellij</resource-bundle>
+  <resource-bundle>com.microsoft.azure.toolkit.operation.titles_common_intellij</resource-bundle>
+  <resource-bundle>com.microsoft.azure.toolkit.operation.titles_connector_intellij</resource-bundle>
+  <resource-bundle>com.microsoft.azure.toolkit.operation.titles_container_intellij</resource-bundle>
+  <resource-bundle>com.microsoft.azure.toolkit.operation.titles_docker_intellij</resource-bundle>
+  <resource-bundle>com.microsoft.azure.toolkit.operation.titles_function_intellij</resource-bundle>
+  <resource-bundle>com.microsoft.azure.toolkit.operation.titles_mysql_intellij</resource-bundle>
+  <resource-bundle>com.microsoft.azure.toolkit.operation.titles_redis_intellij</resource-bundle>
+  <resource-bundle>com.microsoft.azure.toolkit.operation.titles_sdk_intellij</resource-bundle>
+  <resource-bundle>com.microsoft.azure.toolkit.operation.titles_springcloud_intellij</resource-bundle>
+  <resource-bundle>com.microsoft.azure.toolkit.operation.titles_sqlserver_intellij</resource-bundle>
+  <resource-bundle>com.microsoft.azure.toolkit.operation.titles_storage_intellij</resource-bundle>
+  <resource-bundle>com.microsoft.azure.toolkit.operation.titles_vm_intellij</resource-bundle>
+  <resource-bundle>com.microsoft.azure.toolkit.operation.titles_webapp_intellij</resource-bundle>
+</idea-plugin>

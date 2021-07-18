@@ -1,23 +1,6 @@
 /*
- * Copyright (c) Microsoft Corporation
- *
- * All rights reserved.
- *
- * MIT License
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
- * documentation files (the "Software"), to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and
- * to permit persons to whom the Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all copies or substantial portions of
- * the Software.
- *
- * THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
- * THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Licensed under the MIT License. See License.txt in the project root for license information.
  */
 
 package com.microsoft.tooling.msservices.serviceexplorer.azure;
@@ -43,6 +26,7 @@ import com.microsoft.tooling.msservices.serviceexplorer.azure.function.FunctionM
 import com.microsoft.tooling.msservices.serviceexplorer.azure.mysql.MySQLModule;
 import com.microsoft.tooling.msservices.serviceexplorer.azure.rediscache.RedisCacheModule;
 import com.microsoft.tooling.msservices.serviceexplorer.azure.springcloud.SpringCloudModule;
+import com.microsoft.tooling.msservices.serviceexplorer.azure.sqlserver.SqlServerModule;
 import com.microsoft.tooling.msservices.serviceexplorer.azure.storage.StorageModule;
 import com.microsoft.tooling.msservices.serviceexplorer.azure.vmarm.VMArmModule;
 import com.microsoft.tooling.msservices.serviceexplorer.azure.webapp.WebAppModule;
@@ -52,7 +36,6 @@ import java.util.stream.Collectors;
 
 public class AzureModule extends AzureRefreshableNode {
     private static final String AZURE_SERVICE_MODULE_ID = AzureModule.class.getName();
-    private static final String ICON_PATH = "AzureExplorer_16.png";
     private static final String BASE_MODULE_NAME = "Azure";
     private static final String MODULE_NAME_NO_SUBSCRIPTION = "No subscription";
     private static final String ERROR_GETTING_SUBSCRIPTIONS_TITLE = "MS Services - Error Getting Subscriptions";
@@ -85,6 +68,8 @@ public class AzureModule extends AzureRefreshableNode {
     private SpringCloudModule springCloudModule;
     @NotNull
     private MySQLModule mysqlModule;
+    @NotNull
+    private SqlServerModule sqlServerModule;
 
     /**
      * Constructor.
@@ -92,7 +77,7 @@ public class AzureModule extends AzureRefreshableNode {
      * @param project project
      */
     public AzureModule(@Nullable Object project) {
-        super(AZURE_SERVICE_MODULE_ID, composeName(), null, ICON_PATH);
+        super(AZURE_SERVICE_MODULE_ID, composeName(), null, null);
         this.project = project;
         storageModule = new StorageModule(this);
         webAppModule = new WebAppModule(this);
@@ -104,6 +89,7 @@ public class AzureModule extends AzureRefreshableNode {
         functionModule = new FunctionModule(this);
         springCloudModule = new SpringCloudModule(this);
         mysqlModule = new MySQLModule(this);
+        sqlServerModule = new SqlServerModule(this);
         try {
             SignInOutListener signInOutListener = new SignInOutListener();
             AuthMethodManager.getInstance().addSignInEventListener(signInOutListener);
@@ -180,6 +166,9 @@ public class AzureModule extends AzureRefreshableNode {
         if (!isDirectChild(mysqlModule)) {
             addChildNode(mysqlModule);
         }
+        if (!isDirectChild(sqlServerModule)) {
+            addChildNode(sqlServerModule);
+        }
         if (hdInsightModule != null && !isDirectChild(hdInsightModule)) {
             addChildNode(hdInsightModule);
         }
@@ -214,6 +203,9 @@ public class AzureModule extends AzureRefreshableNode {
                 webAppModule.load(true);
                 resourceManagementModule.load(true);
                 functionModule.load(true);
+                springCloudModule.load(true);
+                mysqlModule.load(true);
+                sqlServerModule.load(true);
 
                 if (hdInsightModule != null) {
                     hdInsightModule.load(true);

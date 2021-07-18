@@ -1,31 +1,15 @@
 /*
- * Copyright (c) Microsoft Corporation
- *
- * All rights reserved.
- *
- * MIT License
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
- * documentation files (the "Software"), to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and
- * to permit persons to whom the Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all copies or substantial portions of
- * the Software.
- *
- * THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
- * THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Licensed under the MIT License. See License.txt in the project root for license information.
  */
 
 package com.microsoft.tooling.msservices.serviceexplorer.azure.webapp;
 
-import com.microsoft.azure.management.appservice.WebApp;
+import com.microsoft.azure.toolkit.lib.appservice.model.OperatingSystem;
+import com.microsoft.azure.toolkit.lib.appservice.model.Runtime;
+import com.microsoft.azure.toolkit.lib.appservice.service.IWebApp;
 import com.microsoft.azure.toolkit.lib.common.operation.AzureOperation;
 import com.microsoft.azuretools.azurecommons.helpers.Nullable;
-import com.microsoft.azuretools.core.mvp.model.webapp.AzureWebAppMvpModel;
 import com.microsoft.azuretools.telemetry.AppInsightsConstants;
 import com.microsoft.tooling.msservices.components.DefaultLoader;
 import com.microsoft.tooling.msservices.serviceexplorer.AzureActionEnum;
@@ -42,23 +26,26 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-public class WebAppNode extends WebAppBaseNode implements WebAppNodeView {
+public class WebAppNode extends WebAppBaseNode {
     private static final String LABEL = "WebApp";
     public static final String SSH_INTO = "SSH into Web App (Preview)";
     public static final String PROFILE_FLIGHT_RECORDER = "Profile Flight Recorder";
 
-    private final WebApp webapp;
+    private final IWebApp webappManager;
 
-    public WebAppNode(WebAppModule parent, String subscriptionId, WebApp delegate) {
-        super(delegate.id(), delegate.name(), LABEL, parent, subscriptionId, delegate.defaultHostName(),
-              delegate.operatingSystem().toString(), delegate.state());
-        this.webapp = delegate;
+    public WebAppNode(WebAppModule parent, IWebApp webAppManager) {
+        super(parent, LABEL, webAppManager);
+        this.webappManager = webAppManager;
         loadActions();
+    }
+
+    public IWebApp getWebappManager() {
+        return webappManager;
     }
 
     @Override
     public @Nullable AzureIconSymbol getIconSymbol() {
-        boolean isLinux = OS_LINUX.equalsIgnoreCase(webapp.operatingSystem().toString());
+        boolean isLinux = webappManager.getRuntime().getOperatingSystem() != OperatingSystem.WINDOWS;
         boolean running = WebAppBaseState.RUNNING.equals(state);
         boolean updating = WebAppBaseState.UPDATING.equals(state);
         if (isLinux) {
@@ -70,16 +57,16 @@ public class WebAppNode extends WebAppBaseNode implements WebAppNodeView {
     }
 
     @Override
-    @AzureOperation(value = "refresh content of web app", type = AzureOperation.Type.ACTION)
+    @AzureOperation(name = "webapp.refresh", type = AzureOperation.Type.ACTION)
     protected void refreshItems() {
+        super.refreshItems();
         this.renderSubModules();
     }
 
-    @Override
     public void renderSubModules() {
-        addChildNode(new DeploymentSlotModule(this, this.subscriptionId, this.webapp));
-        addChildNode(new AppServiceUserFilesRootNode(this, this.subscriptionId, this.webapp));
-        addChildNode(new AppServiceLogFilesRootNode(this, this.subscriptionId, this.webapp));
+        addChildNode(new DeploymentSlotModule(this, this.subscriptionId, this.webappManager));
+        addChildNode(new AppServiceUserFilesRootNode(this, this.subscriptionId, this.webappManager));
+        addChildNode(new AppServiceLogFilesRootNode(this, this.subscriptionId, this.webappManager));
     }
 
     @Override
@@ -88,7 +75,7 @@ public class WebAppNode extends WebAppBaseNode implements WebAppNodeView {
         addAction(initActionBuilder(this::start).withAction(AzureActionEnum.START).withBackgroudable(true).build());
         addAction(initActionBuilder(this::restart).withAction(AzureActionEnum.RESTART).withBackgroudable(true).build());
         addAction(initActionBuilder(this::delete).withAction(AzureActionEnum.DELETE).withBackgroudable(true).withPromptable(true).build());
-        addAction(initActionBuilder(this::openInBrowser).withAction(AzureActionEnum.OPEN_IN_PORTAL).withBackgroudable(true).build());
+        addAction(initActionBuilder(this::openInBrowser).withAction(AzureActionEnum.OPEN_IN_BROWSER).withBackgroudable(true).build());
         addAction(initActionBuilder(this::showProperties).withAction(AzureActionEnum.SHOW_PROPERTIES).build());
         super.loadActions();
     }
@@ -103,20 +90,20 @@ public class WebAppNode extends WebAppBaseNode implements WebAppNodeView {
     public Map<String, String> toProperties() {
         final Map<String, String> properties = new HashMap<>();
         properties.put(AppInsightsConstants.SubscriptionId, this.subscriptionId);
-        properties.put(AppInsightsConstants.Region, this.webapp.regionName());
+        properties.put(AppInsightsConstants.Region, this.webappManager.entity().getRegion().getName());
         return properties;
     }
 
     public String getWebAppId() {
-        return this.webapp.id();
+        return this.webappManager.id();
     }
 
     public String getWebAppName() {
-        return this.webapp.name();
+        return this.webappManager.name();
     }
 
-    public String getFxVersion() {
-        return this.webapp.linuxFxVersion();
+    public Runtime getWebAppRuntime() {
+        return this.webappManager.getRuntime();
     }
 
     @Override
@@ -127,39 +114,35 @@ public class WebAppNode extends WebAppBaseNode implements WebAppNodeView {
         return super.getNodeActions();
     }
 
-    public WebApp getWebapp() {
-        return webapp;
-    }
-
-    @AzureOperation(value = "delete web app", type = AzureOperation.Type.ACTION)
+    @AzureOperation(name = "webapp.delete", params = {"this.webapp.name()"}, type = AzureOperation.Type.ACTION)
     private void delete() {
         this.getParent().removeNode(this.getSubscriptionId(), this.getId(), WebAppNode.this);
     }
 
-    @AzureOperation(value = "start web app", type = AzureOperation.Type.ACTION)
+    @AzureOperation(name = "webapp.start", params = {"this.webapp.name()"}, type = AzureOperation.Type.ACTION)
     private void start() {
-        AzureWebAppMvpModel.getInstance().startWebApp(this.subscriptionId, this.webapp.id());
+        this.webappManager.start();
         this.renderNode(WebAppBaseState.RUNNING);
     }
 
-    @AzureOperation(value = "stop web app", type = AzureOperation.Type.ACTION)
+    @AzureOperation(name = "webapp.stop", params = {"this.webapp.name()"}, type = AzureOperation.Type.ACTION)
     private void stop() {
-        AzureWebAppMvpModel.getInstance().stopWebApp(this.subscriptionId, this.webapp.id());
+        this.webappManager.stop();
         this.renderNode(WebAppBaseState.STOPPED);
     }
 
-    @AzureOperation(value = "restart web app", type = AzureOperation.Type.ACTION)
+    @AzureOperation(name = "webapp.restart", params = {"this.webapp.name()"}, type = AzureOperation.Type.ACTION)
     private void restart() {
-        AzureWebAppMvpModel.getInstance().restartWebApp(this.subscriptionId, this.webapp.id());
+        this.webappManager.restart();
         this.renderNode(WebAppBaseState.RUNNING);
     }
 
-    @AzureOperation(value = "open web app in local browser", type = AzureOperation.Type.ACTION)
+    @AzureOperation(name = "webapp.open_browser", params = {"this.webapp.name()"}, type = AzureOperation.Type.ACTION)
     private void openInBrowser() {
-        DefaultLoader.getUIHelper().openInBrowser("http://" + this.hostName);
+        DefaultLoader.getUIHelper().openInBrowser("http://" + this.webappManager.hostName());
     }
 
-    @AzureOperation(value = "show properties of web app", type = AzureOperation.Type.ACTION)
+    @AzureOperation(name = "webapp.show_properties", params = {"this.webapp.name()"}, type = AzureOperation.Type.ACTION)
     private void showProperties() {
         DefaultLoader.getUIHelper().openWebAppPropertyView(WebAppNode.this);
     }

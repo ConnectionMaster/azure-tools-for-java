@@ -1,28 +1,11 @@
 /*
- * Copyright (c) Microsoft Corporation
- *
- * All rights reserved.
- *
- * MIT License
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
- * documentation files (the "Software"), to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and
- * to permit persons to whom the Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all copies or substantial portions of
- * the Software.
- *
- * THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
- * THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Licensed under the MIT License. See License.txt in the project root for license information.
  */
 
 package com.microsoft.azure.toolkit.intellij.webapp.docker.utils;
 
-import com.microsoft.azure.common.exceptions.AzureExecutionException;
+import com.microsoft.azure.toolkit.lib.common.exception.AzureExecutionException;
 import com.microsoft.azure.toolkit.lib.common.operation.AzureOperation;
 import com.microsoft.azuretools.azurecommons.util.Utils;
 import com.microsoft.tooling.msservices.components.DefaultLoader;
@@ -66,20 +49,20 @@ public class DockerUtil {
     /**
      * create container with specified ImageName:TagName.
      */
-    public static String createContainer(DockerClient docker, String imageNameWithTag)
+    public static String createContainer(DockerClient docker, String imageNameWithTag, String containerServerPort)
             throws DockerException, InterruptedException {
         final Map<String, List<PortBinding>> portBindings = new HashMap<>();
         List<PortBinding> randomPort = new ArrayList<>();
         PortBinding randomBinding = PortBinding.randomPort("0.0.0.0");
         randomPort.add(randomBinding);
-        portBindings.put(Constant.TOMCAT_SERVICE_PORT, randomPort);
+        portBindings.put(containerServerPort, randomPort);
 
         final HostConfig hostConfig = HostConfig.builder().portBindings(portBindings).build();
 
         final ContainerConfig config = ContainerConfig.builder()
                 .hostConfig(hostConfig)
                 .image(imageNameWithTag)
-                .exposedPorts(Constant.TOMCAT_SERVICE_PORT)
+                .exposedPorts(containerServerPort)
                 .build();
         final ContainerCreation container = docker.createContainer(config);
         return container.id();
@@ -105,8 +88,8 @@ public class DockerUtil {
      * build image.
      */
     @AzureOperation(
-        value = "build docker image[%s] in dir[%s] on docker host[%s]",
-        params = {"imageNameWithTag", "dockerDirectory.toString()", "$docker.getHost()"},
+        name = "docker|image.build",
+        params = {"imageNameWithTag", "dockerDirectory", "docker.getHost()"},
         type = AzureOperation.Type.TASK
     )
     public static String buildImage(DockerClient docker, String imageNameWithTag, Path dockerDirectory,
@@ -120,8 +103,8 @@ public class DockerUtil {
      * Push image to a private registry.
      */
     @AzureOperation(
-        value = "push docker image[%s] to registry[%s]",
-        params = {"$targetImageName", "$registryUrl"},
+        name = "docker|image.push",
+        params = {"targetImageName", "registryUrl"},
         type = AzureOperation.Type.TASK
     )
     public static void pushImage(DockerClient dockerClient, String registryUrl, String registryUsername,
@@ -196,8 +179,8 @@ public class DockerUtil {
     }
 
     @AzureOperation(
-        value = "try connecting docker[%s]",
-        params = {"$docker.getHost()"},
+        name = "docker.ping",
+        params = {"docker.getHost()"},
         type = AzureOperation.Type.TASK
     )
     public static void ping(DockerClient docker) throws AzureExecutionException {

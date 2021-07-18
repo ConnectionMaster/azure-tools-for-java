@@ -25,8 +25,8 @@ package com.microsoft.azure.hdinsight.spark.run.configuration
 import com.intellij.execution.configurations.ConfigurationFactory
 import com.intellij.execution.configurations.ConfigurationType
 import com.intellij.execution.configurations.ConfigurationTypeUtil
-import com.microsoft.azure.hdinsight.common.CommonConst
-import com.microsoft.intellij.util.PluginUtil
+import com.microsoft.intellij.helpers.AzureIconLoader
+import com.microsoft.tooling.msservices.serviceexplorer.AzureIconSymbol
 import javax.swing.Icon
 
 class SparkFailureTaskDebugConfigurationType : ConfigurationType {
@@ -36,7 +36,7 @@ class SparkFailureTaskDebugConfigurationType : ConfigurationType {
     }
 
     override fun getIcon(): Icon {
-        return PluginUtil.getIcon(CommonConst.SparkFailureTaskDebugIcon_13x_Path)
+        return AzureIconLoader.loadIcon(AzureIconSymbol.Common.APACHE_SPARK_FAILURE_DEBUG);
     }
 
     override fun getConfigurationTypeDescription(): String {

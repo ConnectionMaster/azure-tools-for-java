@@ -1,23 +1,6 @@
 /*
- * Copyright (c) Microsoft Corporation
- *
- * All rights reserved.
- *
- * MIT License
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
- * documentation files (the "Software"), to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and
- * to permit persons to whom the Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all copies or substantial portions of
- * the Software.
- *
- * THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
- * THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Licensed under the MIT License. See License.txt in the project root for license information.
  */
 
 package com.microsoft.intellij.ui;
@@ -32,10 +15,18 @@ import com.intellij.ui.AnActionButton;
 import com.intellij.ui.TableSpeedSearch;
 import com.intellij.ui.ToolbarDecorator;
 import com.intellij.ui.table.JBTable;
+import com.microsoft.azure.toolkit.lib.Azure;
+import com.microsoft.azure.toolkit.lib.auth.AzureAccount;
+import com.microsoft.azure.toolkit.lib.common.operation.AzureOperationBundle;
+import com.microsoft.azure.toolkit.lib.common.operation.IAzureOperationTitle;
+import com.microsoft.azure.toolkit.lib.common.task.AzureTask;
+import com.microsoft.azure.toolkit.lib.common.task.AzureTaskManager;
 import com.microsoft.azuretools.authmanage.AuthMethodManager;
 import com.microsoft.azuretools.authmanage.SubscriptionManager;
 import com.microsoft.azuretools.authmanage.models.SubscriptionDetail;
+import com.microsoft.azuretools.sdkmanage.IdentityAzureManager;
 import com.microsoft.intellij.actions.SelectSubscriptionsAction;
+import com.microsoft.intellij.util.JTableUtils;
 import com.microsoft.azuretools.sdkmanage.AzureManager;
 import com.microsoft.azuretools.telemetry.AppInsightsClient;
 import com.microsoft.azuretools.telemetrywrapper.EventType;
@@ -44,15 +35,19 @@ import com.microsoft.intellij.ui.components.AzureDialogWrapper;
 import com.microsoft.intellij.util.PluginUtil;
 import com.microsoft.tooling.msservices.components.DefaultLoader;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.TableColumn;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import static com.microsoft.azuretools.telemetry.TelemetryConstants.ACCOUNT;
 import static com.microsoft.azuretools.telemetry.TelemetryConstants.GET_SUBSCRIPTIONS;
@@ -64,7 +59,7 @@ public class SubscriptionsDialog extends AzureDialogWrapper {
     private final Project project;
     private JPanel contentPane;
     private JPanel panelTable;
-    private JTable table;
+    private JBTable table;
     private List<SubscriptionDetail> sdl;
 
     private SubscriptionsDialog(List<SubscriptionDetail> sdl, Project project) {
@@ -78,6 +73,8 @@ public class SubscriptionsDialog extends AzureDialogWrapper {
         setSubscriptions();
 
         init();
+
+        table.setAutoCreateRowSorter(true);
     }
 
     /**
@@ -86,7 +83,7 @@ public class SubscriptionsDialog extends AzureDialogWrapper {
     public static SubscriptionsDialog go(List<SubscriptionDetail> sdl, Project project) {
         if (CollectionUtils.isEmpty(sdl)) {
             PluginUtil.displayInfoDialog("No subscription", "No subscription in current account, you may get a free "
-                    + "one from https://azure.microsoft.com/en-us/free/");
+                + "one from https://azure.microsoft.com/en-us/free/");
             return null;
         }
         SubscriptionsDialog d = new SubscriptionsDialog(sdl, project);
@@ -116,11 +113,7 @@ public class SubscriptionsDialog extends AzureDialogWrapper {
             }
             final SubscriptionManager subscriptionManager = manager.getSubscriptionManager();
             subscriptionManager.cleanSubscriptions();
-
-            DefaultTableModel dm = (DefaultTableModel) table.getModel();
-            dm.getDataVector().removeAllElements();
-            dm.fireTableDataChanged();
-
+            Azure.az(AzureAccount.class).account().reloadSubscriptions().block();
             SelectSubscriptionsAction.loadSubscriptions(subscriptionManager, project);
 
             //System.out.println("refreshSubscriptions: calling getSubscriptionDetails()");
@@ -128,16 +121,20 @@ public class SubscriptionsDialog extends AzureDialogWrapper {
             setSubscriptions();
             // to notify subscribers
             subscriptionManager.setSubscriptionDetails(sdl);
-
         }, (ex) -> {
-                ex.printStackTrace();
-                //LOGGER.error("refreshSubscriptions", ex);
-                ErrorWindow.show(project, ex.getMessage(), "Refresh Subscriptions Error");
-            });
+            ex.printStackTrace();
+            ErrorWindow.show(project, ex.getMessage(), "Refresh Subscriptions Error");
+        });
     }
 
     private void setSubscriptions() {
         DefaultTableModel model = (DefaultTableModel) table.getModel();
+        sdl.sort((sub1, sub2) -> {
+            if (sub1.isSelected() != sub2.isSelected()) {
+                return sub1.isSelected() ? -1 : 0;
+            }
+            return StringUtils.compareIgnoreCase(sub1.getSubscriptionName(), sub2.getSubscriptionName());
+        });
         for (SubscriptionDetail sd : sdl) {
             model.addRow(new Object[]{sd.isSelected(), sd.getSubscriptionName(), sd.getSubscriptionId()});
         }
@@ -156,42 +153,34 @@ public class SubscriptionsDialog extends AzureDialogWrapper {
         column.setHeaderValue(""); // Don't show title text
         column.setMinWidth(23);
         column.setMaxWidth(23);
+        JTableUtils.enableBatchSelection(table, CHECKBOX_COLUMN);
         table.getTableHeader().setReorderingAllowed(false);
         new TableSpeedSearch(table);
-
-        // secret functionality: select all subs
-        table.getTableHeader().addMouseListener(new MouseAdapter() {
-            @Override
-            public void mouseClicked(MouseEvent e) {
-                int col = table.columnAtPoint(e.getPoint());
-                if (col == CHECKBOX_COLUMN) {
-                    boolean anySelected = false;
-                    for (int row = 0; row < table.getRowCount(); row++) {
-                        Boolean b = (Boolean) table.getValueAt(row, CHECKBOX_COLUMN);
-                        if (b) {
-                            anySelected = true;
-                            break;
-                        }
-                    }
-                    for (int row = 0; row < table.getRowCount(); row++) {
-                        table.getModel().setValueAt(!anySelected, row, CHECKBOX_COLUMN);
-                    }
-                }
-            }
-        });
 
         AnActionButton refreshAction = new AnActionButton("Refresh", AllIcons.Actions.Refresh) {
             @Override
             public void actionPerformed(AnActionEvent anActionEvent) {
+                this.setEnabled(false);
+                model.setRowCount(0);
+                model.fireTableDataChanged();
+                table.getEmptyText().setText("Refreshing");
                 AppInsightsClient.createByType(AppInsightsClient.EventType.Subscription, "", "Refresh", null);
-                refreshSubscriptions();
+                final IAzureOperationTitle title = AzureOperationBundle.title("account|subscription.refresh");
+                final AzureTask task = new AzureTask(project, title, true, () -> {
+                    try {
+                        SubscriptionsDialog.this.refreshSubscriptions();
+                    } finally {
+                        this.setEnabled(true);
+                    }
+                }, AzureTask.Modality.ANY);
+                AzureTaskManager.getInstance().runInBackground(task);
             }
         };
 
         ToolbarDecorator tableToolbarDecorator =
-                ToolbarDecorator.createDecorator(table)
-                        .disableUpDownActions()
-                        .addExtraActions(refreshAction);
+            ToolbarDecorator.createDecorator(table)
+                .disableUpDownActions()
+                .addExtraActions(refreshAction);
 
         panelTable = tableToolbarDecorator.createPanel();
 
@@ -205,7 +194,6 @@ public class SubscriptionsDialog extends AzureDialogWrapper {
 
     @Override
     protected void doOKAction() {
-        EventUtil.logEvent(EventType.info, ACCOUNT, SELECT_SUBSCRIPTIONS, null);
         DefaultTableModel model = (DefaultTableModel) table.getModel();
         int rc = model.getRowCount();
         int unselectedCount = 0;
@@ -218,8 +206,8 @@ public class SubscriptionsDialog extends AzureDialogWrapper {
 
         if (rc != 0 && unselectedCount == rc) {
             DefaultLoader.getUIHelper().showMessageDialog(
-                    contentPane, "Please select at least one subscription",
-                    "Subscription dialog info", Messages.getInformationIcon());
+                contentPane, "Please select at least one subscription",
+                "Subscription dialog info", Messages.getInformationIcon());
             return;
         }
 
@@ -227,6 +215,24 @@ public class SubscriptionsDialog extends AzureDialogWrapper {
             boolean selected = (boolean) model.getValueAt(ri, CHECKBOX_COLUMN);
             this.sdl.get(ri).setSelected(selected);
         }
+
+        List<String> selectedIds = this.sdl.stream().filter(SubscriptionDetail::isSelected)
+            .map(SubscriptionDetail::getSubscriptionId).collect(Collectors.toList());
+        IdentityAzureManager.getInstance().selectSubscriptionByIds(selectedIds);
+        IdentityAzureManager.getInstance().getSubscriptionManager().notifySubscriptionListChanged();
+        Mono.fromCallable(() -> {
+            AzureAccount az = Azure.az(AzureAccount.class);
+            selectedIds.stream().limit(5).forEach(sid -> {
+                // pr-load regions
+                az.listRegions(sid);
+            });
+            return 1;
+        }).subscribeOn(Schedulers.boundedElastic()).subscribe();
+
+        final Map<String, String> properties = new HashMap<>();
+        properties.put("subsCount", String.valueOf(rc));
+        properties.put("selectedSubsCount", String.valueOf(rc - unselectedCount));
+        EventUtil.logEvent(EventType.info, ACCOUNT, SELECT_SUBSCRIPTIONS, null);
         super.doOKAction();
     }
 
@@ -236,7 +242,7 @@ public class SubscriptionsDialog extends AzureDialogWrapper {
         return "SubscriptionsDialog";
     }
 
-    private class SubscriptionTableModel extends DefaultTableModel {
+    private static class SubscriptionTableModel extends DefaultTableModel {
         final Class[] columnClass = new Class[]{
             Boolean.class, String.class, String.class
         };

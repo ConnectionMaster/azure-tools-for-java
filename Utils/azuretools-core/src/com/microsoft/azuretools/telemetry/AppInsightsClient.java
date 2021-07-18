@@ -1,34 +1,17 @@
 /*
- * Copyright (c) Microsoft Corporation
- *
- * All rights reserved.
- *
- * MIT License
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
- * documentation files (the "Software"), to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and
- * to permit persons to whom the Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all copies or substantial portions of
- * the Software.
- *
- * THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
- * THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Licensed under the MIT License. See License.txt in the project root for license information.
  */
 
 package com.microsoft.azuretools.telemetry;
 
-import com.microsoft.applicationinsights.TelemetryClient;
+import com.microsoft.azure.toolkit.lib.common.telemetry.AzureTelemeter;
+import com.microsoft.azure.toolkit.lib.common.telemetry.AzureTelemetryClient;
 import com.microsoft.azuretools.adauth.StringUtils;
 import com.microsoft.azuretools.azurecommons.helpers.Nullable;
 import com.microsoft.azuretools.telemetrywrapper.TelemetryManager;
 
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.Map;
 
 public class AppInsightsClient {
@@ -114,11 +97,10 @@ public class AppInsightsClient {
         if (isAppInsightsClientAvailable() && configuration.validated()) {
             String prefValue = configuration.preferenceVal();
             if (prefValue == null || prefValue.isEmpty() || prefValue.equalsIgnoreCase("true") || force) {
-                TelemetryClient telemetry = TelemetryClientSingleton.getTelemetry();
+                AzureTelemetryClient telemetry = TelemetryClientSingleton.getTelemetry();
                 Map<String, String> properties = buildProperties(version, myProperties);
                 synchronized (TelemetryClientSingleton.class) {
                     telemetry.trackEvent(eventName, properties, metrics);
-                    telemetry.flush();
                 }
             }
         }
@@ -130,12 +112,7 @@ public class AppInsightsClient {
         properties.put("IDE", configuration.ide());
 
         // Telemetry client doesn't accept null value for ConcurrentHashMap doesn't accept null as key or value..
-        for (Iterator<Map.Entry<String, String>> iter = properties.entrySet().iterator(); iter.hasNext();) {
-            Map.Entry<String, String> entry = iter.next();
-            if (StringUtils.isNullOrEmpty(entry.getKey()) || StringUtils.isNullOrEmpty(entry.getValue())) {
-                iter.remove();
-            }
-        }
+        properties.entrySet().removeIf(entry -> StringUtils.isNullOrEmpty(entry.getKey()) || StringUtils.isNullOrEmpty(entry.getValue()));
         if (version != null && !version.isEmpty()) {
             properties.put("Library Version", version);
         }
@@ -151,52 +128,24 @@ public class AppInsightsClient {
         return properties;
     }
 
-    public static void createFTPEvent(String eventName, String uri, String appName, String subId) {
-        if (!isAppInsightsClientAvailable())
-            return;
-
-        TelemetryClient telemetry = TelemetryClientSingleton.getTelemetry();
-
-        Map<String, String> properties = new HashMap<String, String>();
-        properties.put("SessionId", configuration.sessionId());
-        if (uri != null && !uri.isEmpty()) {
-            properties.put("WebApp URI", uri);
-        }
-        if (appName != null && !appName.isEmpty()) {
-            properties.put("Java app name", appName);
-        }
-        if (subId != null && !subId.isEmpty()) {
-            properties.put("Subscription ID", subId);
-        }
-        if (configuration.validated()) {
-            String pluginVersion = configuration.pluginVersion();
-            if (pluginVersion != null && !pluginVersion.isEmpty()) {
-                properties.put("Plugin Version", pluginVersion);
-            }
-
-            String instID = configuration.installationId();
-            if (instID != null && !instID.isEmpty()) {
-                properties.put("Installation ID", instID);
-            }
-        }
-        synchronized (TelemetryClientSingleton.class) {
-            telemetry.trackEvent(eventName, properties, null);
-            telemetry.flush();
-        }
-    }
-
     private static boolean isAppInsightsClientAvailable() {
         return configuration != null;
     }
 
     private static void initTelemetryManager() {
         try {
-            TelemetryManager.getInstance().setCommonProperties(buildProperties("", new HashMap<>()));
-            TelemetryManager.getInstance().setTelemetryClient(TelemetryClientSingleton.getTelemetry());
-            TelemetryManager.getInstance().setEventNamePrefix(configuration.eventName());
+            final Map<String, String> properties = buildProperties("", new HashMap<>());
+            TelemetryClientSingleton.setConfiguration(configuration);
+            final AzureTelemetryClient client = TelemetryClientSingleton.getTelemetry();
+            final String eventNamePrefix = configuration.eventName();
+            TelemetryManager.getInstance().setTelemetryClient(client);
+            TelemetryManager.getInstance().setCommonProperties(properties);
+            TelemetryManager.getInstance().setEventNamePrefix(eventNamePrefix);
             TelemetryManager.getInstance().sendCachedTelemetries();
+            AzureTelemeter.setClient(client);
+            AzureTelemeter.setCommonProperties(properties);
+            AzureTelemeter.setEventNamePrefix(eventNamePrefix);
         } catch (Exception ignore) {
         }
     }
-
 }

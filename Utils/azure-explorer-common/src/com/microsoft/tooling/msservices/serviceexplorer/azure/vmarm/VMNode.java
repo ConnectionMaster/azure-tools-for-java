@@ -1,23 +1,6 @@
 /*
- * Copyright (c) Microsoft Corporation
- *
- * All rights reserved.
- *
- * MIT License
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
- * documentation files (the "Software"), to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and
- * to permit persons to whom the Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all copies or substantial portions of
- * the Software.
- *
- * THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
- * THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Licensed under the MIT License. See License.txt in the project root for license information.
  */
 
 package com.microsoft.tooling.msservices.serviceexplorer.azure.vmarm;
@@ -64,7 +47,7 @@ public class VMNode extends RefreshableNode implements TelemetryProperties {
         return running ? AzureIconSymbol.VirtualMachine.RUNNING : AzureIconSymbol.VirtualMachine.STOPPED;
     }
 
-    @AzureOperation(value = ActionConstants.VirtualMachine.DELETE, type = AzureOperation.Type.ACTION)
+    @AzureOperation(name = "vm.delete", params = {"this.virtualMachine.name()"}, type = AzureOperation.Type.ACTION)
     private void delete() {
         AzureManager azureManager = AuthMethodManager.getInstance().getAzureManager();
         // not signed in
@@ -78,19 +61,19 @@ public class VMNode extends RefreshableNode implements TelemetryProperties {
         });
     }
 
-    @AzureOperation(value = ActionConstants.VirtualMachine.START, type = AzureOperation.Type.ACTION)
+    @AzureOperation(name = "vm.start", params = {"this.virtualMachine.name()"}, type = AzureOperation.Type.ACTION)
     private void start() {
         virtualMachine.start();
         refreshItems();
     }
 
-    @AzureOperation(value = ActionConstants.VirtualMachine.RESTART, type = AzureOperation.Type.ACTION)
+    @AzureOperation(name = "vm.restart", params = {"this.virtualMachine.name()"}, type = AzureOperation.Type.ACTION)
     private void restart() {
         virtualMachine.restart();
         refreshItems();
     }
 
-    @AzureOperation(value = ActionConstants.VirtualMachine.STOP, type = AzureOperation.Type.ACTION)
+    @AzureOperation(name = "vm.stop", params = {"this.virtualMachine.name()"}, type = AzureOperation.Type.ACTION)
     private void stop() {
         virtualMachine.powerOff();
         refreshItems();
@@ -99,10 +82,6 @@ public class VMNode extends RefreshableNode implements TelemetryProperties {
     private static final String WAIT_ICON_PATH = "VirtualMachineUpdating_16.png";
     private static final String STOP_ICON_PATH = "VirtualMachineStopped_16.png";
     private static final String RUN_ICON_PATH = "VirtualMachineRunning_16.png";
-    public static final String ACTION_DOWNLOAD_RDP_FILE = "Connect Remote Desktop";
-    private static final String ACTION_SHUTDOWN = "Shutdown";
-    private static final String ACTION_SHUTDOWN_ICON = "Stop.png";
-    public static final int REMOTE_DESKTOP_PORT = 3389;
 
     private VirtualMachine virtualMachine;
     private String subscriptionId;
@@ -165,7 +144,7 @@ public class VMNode extends RefreshableNode implements TelemetryProperties {
     @Override
     public List<NodeAction> getNodeActions() {
         boolean started = isRunning();
-        getNodeActionByName(ACTION_SHUTDOWN).setEnabled(started);
+        getNodeActionByName(AzureActionEnum.STOP.getName()).setEnabled(started);
         getNodeActionByName(AzureActionEnum.START.getName()).setEnabled(!started);
         getNodeActionByName(AzureActionEnum.RESTART.getName()).setEnabled(started);
 

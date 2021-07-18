@@ -1,23 +1,6 @@
 /*
- * Copyright (c) Microsoft Corporation
- *
- * All rights reserved.
- *
- * MIT License
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
- * documentation files (the "Software"), to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and
- * to permit persons to whom the Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all copies or substantial portions of
- * the Software.
- *
- * THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
- * THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Licensed under the MIT License. See License.txt in the project root for license information.
  */
 
 package com.microsoft.azure.toolkit.intellij.function.runner.localrun;
@@ -39,22 +22,22 @@ import com.intellij.execution.runners.ExecutionUtil;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.wm.ToolWindowId;
 import com.intellij.psi.PsiMethod;
-import com.microsoft.azure.common.exceptions.AzureExecutionException;
-import com.microsoft.azure.common.function.bindings.BindingEnum;
-import com.microsoft.azure.common.function.configurations.FunctionConfiguration;
-import com.microsoft.azure.management.appservice.FunctionApp;
+import com.microsoft.azure.toolkit.intellij.common.AzureRunProfileState;
+import com.microsoft.azure.toolkit.intellij.function.runner.core.FunctionUtils;
+import com.microsoft.azure.toolkit.lib.appservice.service.IFunctionApp;
+import com.microsoft.azure.toolkit.lib.common.exception.AzureExecutionException;
 import com.microsoft.azure.toolkit.lib.common.exception.AzureToolkitRuntimeException;
 import com.microsoft.azure.toolkit.lib.common.operation.AzureOperation;
 import com.microsoft.azure.toolkit.lib.common.task.AzureTask;
 import com.microsoft.azure.toolkit.lib.common.task.AzureTaskManager;
+import com.microsoft.azure.toolkit.lib.legacy.function.bindings.BindingEnum;
+import com.microsoft.azure.toolkit.lib.legacy.function.configurations.FunctionConfiguration;
 import com.microsoft.azuretools.telemetry.TelemetryConstants;
 import com.microsoft.azuretools.telemetrywrapper.Operation;
 import com.microsoft.azuretools.telemetrywrapper.TelemetryManager;
 import com.microsoft.azuretools.utils.CommandUtils;
 import com.microsoft.azuretools.utils.JsonUtils;
-import com.microsoft.azure.toolkit.intellij.common.AzureRunProfileState;
 import com.microsoft.intellij.RunProcessHandler;
-import com.microsoft.azure.toolkit.intellij.function.runner.core.FunctionUtils;
 import com.microsoft.intellij.util.ReadStreamLineThread;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang3.ArrayUtils;
@@ -77,7 +60,7 @@ import java.util.regex.Pattern;
 
 import static com.microsoft.intellij.ui.messages.AzureBundle.message;
 
-public class FunctionRunState extends AzureRunProfileState<FunctionApp> {
+public class FunctionRunState extends AzureRunProfileState<IFunctionApp> {
 
     private static final int DEFAULT_FUNC_PORT = 7071;
     private static final int DEFAULT_DEBUG_PORT = 5005;
@@ -107,12 +90,7 @@ public class FunctionRunState extends AzureRunProfileState<FunctionApp> {
         this.functionRunConfiguration = functionRunConfiguration;
     }
 
-    @Override
-    protected String getDeployTarget() {
-        return "null";
-    }
-
-    @AzureOperation(value = "launch debugger for function", type = AzureOperation.Type.TASK)
+    @AzureOperation(name = "function.launch_debugger", type = AzureOperation.Type.TASK)
     private void launchDebugger(final Project project, int debugPort) {
         final Runnable runnable = () -> {
             final RunManagerImpl manager = new RunManagerImpl(project);
@@ -132,22 +110,21 @@ public class FunctionRunState extends AzureRunProfileState<FunctionApp> {
     }
 
     @Override
-    @AzureOperation(value = "trigger function app", type = AzureOperation.Type.ACTION)
-    protected FunctionApp executeSteps(@NotNull RunProcessHandler processHandler, @NotNull Map<String, String> telemetryMap) throws Exception {
+    @AzureOperation(name = "function.run.state", type = AzureOperation.Type.ACTION)
+    protected IFunctionApp executeSteps(@NotNull RunProcessHandler processHandler, @NotNull Operation operation) throws Exception {
         // Prepare staging Folder
-        updateTelemetryMap(telemetryMap);
         validateFunctionRuntime(processHandler);
         stagingFolder = FunctionUtils.getTempStagingFolder();
         addProcessTerminatedListener(processHandler);
-        prepareStagingFolder(stagingFolder, processHandler);
+        prepareStagingFolder(stagingFolder, processHandler, operation);
         // Run Function Host
         runFunctionCli(processHandler, stagingFolder);
         return null;
     }
 
     @AzureOperation(
-        value = "validate runtime of function[%s]",
-        params = {"@functionRunConfiguration.getFuncPath()"},
+        name = "function.validate_runtime",
+        params = {"this.functionRunConfiguration.getFuncPath()"},
         type = AzureOperation.Type.TASK
     )
     private void validateFunctionRuntime(RunProcessHandler processHandler) {
@@ -180,8 +157,8 @@ public class FunctionRunState extends AzureRunProfileState<FunctionApp> {
     }
 
     @AzureOperation(
-        value = "get version of function[%s]",
-        params = {"@functionRunConfiguration.getFuncPath()"},
+        name = "function.get_version",
+        params = {"this.functionRunConfiguration.getFuncPath()"},
         type = AzureOperation.Type.TASK
     )
     private ComparableVersion getFuncVersion() throws IOException {
@@ -197,7 +174,7 @@ public class FunctionRunState extends AzureRunProfileState<FunctionApp> {
     // Get java runtime version following the strategy of function core tools
     // Get java version of JAVA_HOME first, fall back to use PATH if JAVA_HOME not exists
     @AzureOperation(
-        value = "validate version of local jre",
+        name = "function.validate_jre",
         type = AzureOperation.Type.TASK
     )
     private ComparableVersion getJavaVersion() throws IOException {
@@ -215,8 +192,8 @@ public class FunctionRunState extends AzureRunProfileState<FunctionApp> {
     }
 
     @AzureOperation(
-        value = "run function CLI command from staging folder[%s]",
-        params = {"$stagingFolder.getName()"},
+        name = "function|cli.run",
+        params = {"stagingFolder.getName()"},
         type = AzureOperation.Type.SERVICE
     )
     private void runFunctionCli(RunProcessHandler processHandler, File stagingFolder)
@@ -288,11 +265,13 @@ public class FunctionRunState extends AzureRunProfileState<FunctionApp> {
     }
 
     @AzureOperation(
-        value = "prepare staging folder[%s] for function model[%s]",
-        params = {"$stagingFolder.getName()", "@functionRunConfiguration.getFuncPath()"},
+        name = "function.prepare_staging_folder_detail",
+        params = {"stagingFolder.getName()", "this.functionRunConfiguration.getFuncPath()"},
         type = AzureOperation.Type.SERVICE
     )
-    private void prepareStagingFolder(File stagingFolder, RunProcessHandler processHandler) throws Exception {
+    private void prepareStagingFolder(File stagingFolder,
+                                      RunProcessHandler processHandler,
+                                      final @NotNull Operation operation) throws Exception {
         AzureTaskManager.getInstance().read(() -> {
             final Path hostJsonPath = FunctionUtils.getDefaultHostJson(project);
             final Path localSettingsJson = Paths.get(functionRunConfiguration.getLocalSettingsJsonPath());
@@ -301,7 +280,9 @@ public class FunctionRunState extends AzureRunProfileState<FunctionApp> {
             try {
                 Map<String, FunctionConfiguration> configMap =
                     FunctionUtils.prepareStagingFolder(folder, hostJsonPath, functionRunConfiguration.getModule(), methods);
-                FunctionUtils.copyLocalSettingsToStagingFolder(folder, localSettingsJson, functionRunConfiguration.getAppSettings());
+                operation.trackProperty(TelemetryConstants.TRIGGER_TYPE, StringUtils.join(FunctionUtils.getFunctionBindingList(configMap), ","));
+                final Map<String, String> appSettings = FunctionUtils.loadAppSettingsFromSecurityStorage(functionRunConfiguration.getAppSettingsKey());
+                FunctionUtils.copyLocalSettingsToStagingFolder(folder, localSettingsJson, appSettings);
 
                 final Set<BindingEnum> bindingClasses = getFunctionBindingEnums(configMap);
                 if (isInstallingExtensionNeeded(bindingClasses, processHandler)) {
@@ -356,8 +337,8 @@ public class FunctionRunState extends AzureRunProfileState<FunctionApp> {
     }
 
     @Override
-    protected void updateTelemetryMap(@NotNull Map<String, String> telemetryMap) {
-        telemetryMap.putAll(functionRunConfiguration.getModel().getTelemetryProperties(telemetryMap));
+    protected Map<String, String> getTelemetryMap() {
+        return functionRunConfiguration.getModel().getTelemetryProperties();
     }
 
     @Override
@@ -367,11 +348,11 @@ public class FunctionRunState extends AzureRunProfileState<FunctionApp> {
 
     @Override
     @AzureOperation(
-        value = "complete running function model[%s] and clean up staging folder[%s]",
-        params = {"@functionRunConfiguration.getFuncPath()", "$stagingFolder.getName()"},
+        name = "function.complete_local_run",
+        params = {"this.functionRunConfiguration.getFuncPath()"},
         type = AzureOperation.Type.TASK
     )
-    protected void onSuccess(FunctionApp result, RunProcessHandler processHandler) {
+    protected void onSuccess(IFunctionApp result, RunProcessHandler processHandler) {
         stopProcessIfAlive(process);
 
         if (!processHandler.isProcessTerminated()) {

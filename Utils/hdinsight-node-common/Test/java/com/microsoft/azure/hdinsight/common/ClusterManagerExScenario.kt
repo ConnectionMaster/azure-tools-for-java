@@ -75,10 +75,6 @@ class ClusterManagerExScenario {
                 return mock(INotification::class.java)
             }
 
-            override fun getWebUi(): IWebUi {
-                return mock(IWebUi::class.java)
-            }
-
             override fun getProgressTaskImpl(): IProgressTaskImpl {
                 return mock(IProgressTaskImpl::class.java)
             }

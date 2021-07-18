@@ -1,5 +1,78 @@
-<!-- Version: 3.47.0 -->
+<!-- Version: 3.51.0 -->
 # What's new in Azure Toolkit for IntelliJ
+
+## 3.54.0
+### Added
+- User would be reminded if deprecated Azure SDK libs are used in project.
+- Development workflow for SQL Server on Azure: user can now connect SQL Server to local project from Azure Explorer, project, module or application.properties file.
+
+### Changed
+- Services are grouped by category in Azure SDK reference book so that user can quickly locate the libs they want.
+- Error messages are unified.
+
+## 3.53.0
+### Added
+- Management workflow for Azure SQL Server
+- New login ui for service principal authentication
+
+### Changed
+- Deprecated file based service principal authentication
+
+### Fixed
+- [PR #5228](https://github.com/microsoft/azure-tools-for-java/pull/5228) Fix OAuth/Device login could not be cancelled
+
+## 3.52.0
+### Added
+- Support OAuth for authentication
+- Add support for management/client sdk in Azure SDK reference book
+
+### Changed
+- Improve UI for azure service connector
+
+### Fixed
+- [#5121](https://github.com/microsoft/azure-tools-for-java/issues/5121) Fix project disposed exception for workspace tagging
+- [PR #5163](https://github.com/microsoft/azure-tools-for-java/pull/5163) Fix enable local access may not work for Azure MySQL
+
+## 3.51.0
+### Added
+<img src="https://user-images.githubusercontent.com/69189193/113823126-da73ea00-97b0-11eb-9b69-958f5d5a2b00.gif" width="840" height="525" />
+
+- Add support for IntelliJ 2021.1 EAP
+- Add Azure SDK reference book for Spring
+
+### Changed
+- Improve resource list performance with cache and preload
+- Update Azure related run configuration icons
+- Continue with warning for multi-tenant issues while getting subscriptions
+- Remove preview label for function and spring cloud
+
+### Fixed
+- [#5002](https://github.com/microsoft/azure-tools-for-java/issues/5002) Failed to run Spark application with filled-in default Azure Blob storage account credential
+- [#5008](https://github.com/microsoft/azure-tools-for-java/issues/5008) IndexOutOfBoundsException while create MySQL connection
+- [PR #4987](https://github.com/microsoft/azure-tools-for-java/pull/4987) InvalidParameterException occurs when close a streaming log
+- [PR #4987](https://github.com/microsoft/azure-tools-for-java/pull/4987) Failed when select file to deploy to Azure Web App 
+- [PR #4998](https://github.com/microsoft/azure-tools-for-java/pull/4998) Fix IDEA203 regression of Spark failure debug in local
+- [PR #5006](https://github.com/microsoft/azure-tools-for-java/pull/5006) Fix NPE of exploring ADLS Gen2 FS in Spark job conf
+- [PR #5009](https://github.com/microsoft/azure-tools-for-java/pull/5009) Fix bundle build JCEF issue
+- [PR #5014](https://github.com/microsoft/azure-tools-for-java/pull/5014) Failed to create MySQL instance as resource provider is not registered 
+- [PR #5055](https://github.com/microsoft/azure-tools-for-java/pull/5055) Can't deploy to Azure Web App when there is "Connect Azure Resource" in before launch
+
+## 3.50.0
+
+### Added
+<img src="https://user-images.githubusercontent.com/19339116/109937625-11666400-7d0a-11eb-9850-82a62d65f3fa.gif" width="840" height="525" />
+
+- Development workflow for Azure Database for MySQL
+  - Connect Azure Database for MySQL Server to local project from Azure Explorer or application.properties file
+  - Automatically inject datasource connection properties into runtime environment for local run
+  - Publish Azure Web App with datasource connection properties in application settings
+
+## 3.49.0
+
+### Changed
+- Collect performance metrics data via telemetry for future performance tuning.
+- Update the status text on progress indicator.
+- Update context menu icons in Azure Explorer.
 
 ## 3.48.0
 

@@ -1,23 +1,6 @@
 /*
- * Copyright (c) Microsoft Corporation
- *
- * All rights reserved.
- *
- * MIT License
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
- * documentation files (the "Software"), to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and
- * to permit persons to whom the Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all copies or substantial portions of
- * the Software.
- *
- * THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
- * THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Licensed under the MIT License. See License.txt in the project root for license information.
  */
 
 package com.microsoft.azure.toolkit.intellij.function.runner.localrun.ui;
@@ -47,6 +30,8 @@ import javax.swing.JPanel;
 import java.io.IOException;
 import java.nio.file.Paths;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.UUID;
 
 import static com.microsoft.intellij.ui.messages.AzureBundle.message;
 
@@ -58,6 +43,7 @@ public class FunctionRunPanel extends AzureSettingPanel<FunctionRunConfiguration
     private JPanel pnlAppSettings;
     private JComboBox<Module> cbFunctionModule;
     private AppSettingsTable appSettingsTable;
+    private String appSettingsKey = UUID.randomUUID().toString();
 
     private FunctionRunConfiguration functionRunConfiguration;
 
@@ -102,6 +88,10 @@ public class FunctionRunPanel extends AzureSettingPanel<FunctionRunConfiguration
         if (MapUtils.isNotEmpty(configuration.getAppSettings())) {
             appSettingsTable.setAppSettings(configuration.getAppSettings());
         }
+        if (StringUtils.isNotEmpty(configuration.getAppSettingsKey())) {
+            this.appSettingsKey = configuration.getAppSettingsKey();
+            appSettingsTable.setAppSettings(FunctionUtils.loadAppSettingsFromSecurityStorage(appSettingsKey));
+        }
         // In case `FUNCTIONS_WORKER_RUNTIME` or `AZURE_WEB_JOB_STORAGE_KEY` was missed in configuration
         appSettingsTable.loadRequiredSettings();
         if (StringUtils.isNotEmpty(configuration.getFuncPath())) {
@@ -119,8 +109,11 @@ public class FunctionRunPanel extends AzureSettingPanel<FunctionRunConfiguration
     @Override
     protected void apply(@NotNull FunctionRunConfiguration configuration) {
         configuration.setFuncPath(txtFunc.getText());
-        configuration.setAppSettings(appSettingsTable.getAppSettings());
         configuration.saveModule((Module) cbFunctionModule.getSelectedItem());
+        FunctionUtils.saveAppSettingsToSecurityStorage(appSettingsKey, appSettingsTable.getAppSettings());
+        // save app settings storage key instead of real value
+        configuration.setAppSettings(Collections.EMPTY_MAP);
+        configuration.setAppSettingsKey(appSettingsKey);
     }
 
     @NotNull

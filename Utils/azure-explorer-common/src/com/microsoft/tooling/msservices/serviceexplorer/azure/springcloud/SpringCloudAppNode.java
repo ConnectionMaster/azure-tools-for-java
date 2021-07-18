@@ -1,128 +1,142 @@
 /*
- * Copyright (c) Microsoft Corporation
- *
- * All rights reserved.
- *
- * MIT License
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
- * documentation files (the "Software"), to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and
- * to permit persons to whom the Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all copies or substantial portions of
- * the Software.
- *
- * THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
- * THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Licensed under the MIT License. See License.txt in the project root for license information.
  */
 
 package com.microsoft.tooling.msservices.serviceexplorer.azure.springcloud;
 
-import com.microsoft.azure.management.appplatform.v2020_07_01.DeploymentResourceStatus;
-import com.microsoft.azure.management.appplatform.v2020_07_01.implementation.AppResourceInner;
-import com.microsoft.azure.management.appplatform.v2020_07_01.implementation.DeploymentResourceInner;
-import com.microsoft.azure.toolkit.lib.common.task.AzureTask;
+import com.microsoft.azure.toolkit.lib.common.event.AzureEventBus;
+import com.microsoft.azure.toolkit.lib.common.operation.AzureOperation;
 import com.microsoft.azure.toolkit.lib.common.task.AzureTaskManager;
+import com.microsoft.azure.toolkit.lib.springcloud.SpringCloudApp;
+import com.microsoft.azure.toolkit.lib.springcloud.model.SpringCloudDeploymentStatus;
 import com.microsoft.azuretools.azurecommons.helpers.Nullable;
-import com.microsoft.azuretools.core.mvp.model.springcloud.AzureSpringCloudMvpModel;
-import com.microsoft.azuretools.core.mvp.model.springcloud.SpringCloudIdHelper;
+import com.microsoft.azuretools.telemetry.TelemetryConstants;
+import com.microsoft.azuretools.telemetry.TelemetryProperties;
 import com.microsoft.tooling.msservices.components.DefaultLoader;
 import com.microsoft.tooling.msservices.serviceexplorer.AzureActionEnum;
 import com.microsoft.tooling.msservices.serviceexplorer.AzureIconSymbol;
 import com.microsoft.tooling.msservices.serviceexplorer.BasicActionBuilder;
 import com.microsoft.tooling.msservices.serviceexplorer.Node;
-import com.microsoft.tooling.msservices.serviceexplorer.NodeAction;
-import com.microsoft.tooling.msservices.serviceexplorer.NodeActionEvent;
-import com.microsoft.tooling.msservices.serviceexplorer.NodeActionListener;
-import io.reactivex.rxjava3.disposables.Disposable;
+import lombok.Getter;
 import org.apache.commons.lang3.StringUtils;
 
+import javax.annotation.Nonnull;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.Objects;
+import java.util.Optional;
 
-public class SpringCloudAppNode extends Node implements SpringCloudAppNodeView {
+public class SpringCloudAppNode extends Node implements TelemetryProperties {
 
     private static final String ACTION_OPEN_IN_BROWSER = "Open In Browser";
-    private static final Map<DeploymentResourceStatus, AzureIconSymbol> STATUS_TO_ICON_MAP = new HashMap<>();
+    private static final Map<String, AzureIconSymbol> STATUS_TO_ICON_MAP = new HashMap<>();
+    @Getter
+    private final SpringCloudApp app;
+    private String status;
 
-    private AppResourceInner app;
-    private DeploymentResourceStatus status;
-    private DeploymentResourceInner deploy;
-
-    private final String clusterName;
-    private final String subscriptionId;
-    private final String clusterId;
-    private final Disposable rxSubscription;
+    public static final String STATUS_UPDATING = "Updating";
 
     static {
-        STATUS_TO_ICON_MAP.put(DeploymentResourceStatus.UNKNOWN, AzureIconSymbol.SpringCloud.UNKNOWN);
-        STATUS_TO_ICON_MAP.put(DeploymentResourceStatus.RUNNING, AzureIconSymbol.SpringCloud.RUNNING);
-        STATUS_TO_ICON_MAP.put(DeploymentResourceStatus.ALLOCATING, AzureIconSymbol.SpringCloud.PENDING);
-        STATUS_TO_ICON_MAP.put(DeploymentResourceStatus.COMPILING, AzureIconSymbol.SpringCloud.PENDING);
-        STATUS_TO_ICON_MAP.put(DeploymentResourceStatus.UPGRADING, AzureIconSymbol.SpringCloud.PENDING);
-        STATUS_TO_ICON_MAP.put(DeploymentResourceStatus.STOPPED, AzureIconSymbol.SpringCloud.STOPPED);
-        STATUS_TO_ICON_MAP.put(DeploymentResourceStatus.FAILED, AzureIconSymbol.SpringCloud.FAILED);
+        STATUS_TO_ICON_MAP.put(STATUS_UPDATING, AzureIconSymbol.SpringCloud.UPDATING);
+        STATUS_TO_ICON_MAP.put(SpringCloudDeploymentStatus.UNKNOWN.getLabel(), AzureIconSymbol.SpringCloud.UNKNOWN);
+        STATUS_TO_ICON_MAP.put(SpringCloudDeploymentStatus.RUNNING.getLabel(), AzureIconSymbol.SpringCloud.RUNNING);
+        STATUS_TO_ICON_MAP.put(SpringCloudDeploymentStatus.ALLOCATING.getLabel(), AzureIconSymbol.SpringCloud.PENDING);
+        STATUS_TO_ICON_MAP.put(SpringCloudDeploymentStatus.COMPILING.getLabel(), AzureIconSymbol.SpringCloud.PENDING);
+        STATUS_TO_ICON_MAP.put(SpringCloudDeploymentStatus.UPGRADING.getLabel(), AzureIconSymbol.SpringCloud.PENDING);
+        STATUS_TO_ICON_MAP.put(SpringCloudDeploymentStatus.STOPPED.getLabel(), AzureIconSymbol.SpringCloud.STOPPED);
+        STATUS_TO_ICON_MAP.put(SpringCloudDeploymentStatus.FAILED.getLabel(), AzureIconSymbol.SpringCloud.FAILED);
     }
 
-    public SpringCloudAppNode(AppResourceInner app, DeploymentResourceInner deploy, SpringCloudNode parent) {
-        super(app.id(), app.name(), parent, getIconForStatus(deploy == null ? DeploymentResourceStatus.UNKNOWN : deploy.properties().status()), true);
+    public SpringCloudAppNode(@Nonnull SpringCloudApp app, SpringCloudNode parent) {
+        super(app.entity().getId(), app.name(), parent, null, true);
         this.app = app;
-        this.deploy = deploy;
-        this.clusterName = SpringCloudIdHelper.getClusterName(app.id());
-        this.clusterId = parent.getClusterId();
-        this.subscriptionId = SpringCloudIdHelper.getSubscriptionId(app.id());
-        fillData(app, deploy);
-        rxSubscription = SpringCloudStateManager.INSTANCE.subscribeSpringAppEvent(event -> {
-            if (event.isUpdate()) {
-                fillData(event.getAppInner(), event.getDeploymentInner());
-            }
-        }, this.app.id());
+        AzureEventBus.after("springcloud|app.start", this::onAppStatusChanged);
+        AzureEventBus.after("springcloud|app.stop", this::onAppStatusChanged);
+        AzureEventBus.after("springcloud|app.restart", this::onAppStatusChanged);
+        AzureEventBus.before("springcloud|app.start", this::onAppStatusChanging);
+        AzureEventBus.before("springcloud|app.stop", this::onAppStatusChanging);
+        AzureEventBus.before("springcloud|app.restart", this::onAppStatusChanging);
+        AzureEventBus.before("springcloud|app.remove", this::onAppStatusChanging);
+        this.status = this.refreshStatus();
+        this.loadActions();
+        this.rerender();
+    }
+
+    public void onAppStatusChanged(SpringCloudApp app) {
+        if (this.app.name().equals(app.name())) {
+            this.status = this.refreshStatus();
+            this.rerender();
+        }
+    }
+
+    public void onAppStatusChanging(SpringCloudApp app) {
+        if (this.app.name().equals(app.name())) {
+            this.status = STATUS_UPDATING;
+        }
+    }
+
+    private String refreshStatus() {
+        return Optional.ofNullable(this.app.refresh().activeDeployment())
+                .map(d -> d.refresh())
+                .map(d -> d.entity().getStatus())
+                .orElse(SpringCloudDeploymentStatus.UNKNOWN).getLabel();
+    }
+
+    private void rerender() {
+        this.setName(String.format("%s - %s", this.app.name(), status));
+        final boolean stopped = SpringCloudDeploymentStatus.STOPPED.getLabel().equals(status);
+        final boolean running = SpringCloudDeploymentStatus.RUNNING.getLabel().equals(status);
+        final boolean unknown = SpringCloudDeploymentStatus.UNKNOWN.getLabel().equals(status);
+        final boolean allocating = SpringCloudDeploymentStatus.ALLOCATING.getLabel().equals(status);
+        final boolean hasURL = Optional.ofNullable(app.entity().getApplicationUrl()).filter(u -> u.startsWith("http")).isPresent();
+        getNodeActionByName(ACTION_OPEN_IN_BROWSER).setEnabled(hasURL && running);
+        getNodeActionByName(AzureActionEnum.START.getName()).setEnabled(stopped);
+        getNodeActionByName(AzureActionEnum.STOP.getName()).setEnabled(!stopped && !unknown && !allocating);
+        getNodeActionByName(AzureActionEnum.RESTART.getName()).setEnabled(!stopped && !unknown && !allocating);
+    }
+
+    @AzureOperation(name = "springcloud|app.delete", params = {"this.app.name()"}, type = AzureOperation.Type.ACTION)
+    private void delete() {
+        app.remove();
+    }
+
+    @AzureOperation(name = "springcloud|app.start", params = {"this.app.name()"}, type = AzureOperation.Type.ACTION)
+    private void start() {
+        app.start();
+    }
+
+    @AzureOperation(name = "springcloud|app.stop", params = {"this.app.name()"}, type = AzureOperation.Type.ACTION)
+    private void stop() {
+        app.stop();
+    }
+
+    @AzureOperation(name = "springcloud|app.restart", params = {"this.app.name()"}, type = AzureOperation.Type.ACTION)
+    private void restart() {
+        app.restart();
+    }
+
+    @AzureOperation(name = "springcloud|app.open_portal", params = {"this.app.name()"}, type = AzureOperation.Type.ACTION)
+    private void openInPortal() {
+        openResourcesInPortal(app.entity().getSubscriptionId(), app.entity().getId());
+    }
+
+    @AzureOperation(name = "springcloud|app.show_properties", params = {"this.app.name()"}, type = AzureOperation.Type.ACTION)
+    private void showProperties() {
+        AzureTaskManager.getInstance().runLater(() -> DefaultLoader.getUIHelper().openSpringCloudAppPropertyView(SpringCloudAppNode.this));
+    }
+
+    @AzureOperation(name = "springcloud|app.open_browser", params = {"this.app.name()"}, type = AzureOperation.Type.ACTION)
+    private void openInBrowser() {
+        if (StringUtils.isNotEmpty(app.entity().getApplicationUrl())) {
+            DefaultLoader.getUIHelper().openInBrowser(app.entity().getApplicationUrl());
+        } else {
+            DefaultLoader.getUIHelper().showInfo(this, "Public url is not available for app: " + app.name());
+        }
     }
 
     @Override
     public @Nullable AzureIconSymbol getIconSymbol() {
-        if (Objects.isNull(deploy) || Objects.isNull(deploy.properties().status())) {
-            return AzureIconSymbol.SpringCloud.UNKNOWN;
-        }
-        return STATUS_TO_ICON_MAP.get(deploy.properties().status());
-    }
-
-    @Override
-    public List<NodeAction> getNodeActions() {
-        syncActionState();
-        return super.getNodeActions();
-    }
-
-    public void unsubscribe() {
-        if (rxSubscription != null && !rxSubscription.isDisposed()) {
-            rxSubscription.dispose();
-        }
-    }
-
-    public String getClusterName() {
-        return clusterName;
-    }
-
-    public String getClusterId() {
-        return clusterId;
-    }
-
-    public String getAppName() {
-        return app.name();
-    }
-
-    public String getAppId() {
-        return app.id();
-    }
-
-    public String getSubscriptionId() {
-        return subscriptionId;
+        return STATUS_TO_ICON_MAP.get(status);
     }
 
     @Override
@@ -143,94 +157,14 @@ public class SpringCloudAppNode extends Node implements SpringCloudAppNodeView {
                 .withInstanceName(name);
     }
 
-    private static NodeActionListener createBackgroundActionListener(final String actionName, final Runnable runnable) {
-        return new NodeActionListener() {
-            @Override
-            protected void actionPerformed(NodeActionEvent e) {
-                AzureTaskManager.getInstance().runInBackground(new AzureTask(null, String.format("%s...", actionName), false, runnable));
-            }
-        };
+    public void unsubscribe() {
+        // TODO: remove app event listeners
     }
 
-    private static String getStatusDisplay(DeploymentResourceStatus status) {
-        return status == null ? "Unknown" : status.toString();
+    @Override
+    public Map<String, String> toProperties() {
+        final Map<String, String> properties = new HashMap<>();
+        properties.put(TelemetryConstants.SUBSCRIPTIONID, this.app.entity().getSubscriptionId());
+        return properties;
     }
-
-    private static String getIconForStatus(DeploymentResourceStatus statusEnum) {
-        final String displayText = getStatusDisplay(statusEnum);
-        String simpleStatus = displayText.endsWith("ing") && !StringUtils.equalsIgnoreCase(displayText, "running") ? "pending" : displayText.toLowerCase();
-        return String.format("azure-springcloud-app-%s.png", simpleStatus);
-    }
-
-    private void syncActionState() {
-        if (status != null) {
-            boolean stopped = DeploymentResourceStatus.STOPPED.equals(status);
-            boolean running = DeploymentResourceStatus.RUNNING.equals(status);
-            boolean unknown = DeploymentResourceStatus.UNKNOWN.equals(status);
-            boolean allocating = DeploymentResourceStatus.ALLOCATING.equals(status);
-            boolean hasURL = StringUtils.isNotEmpty(app.properties().url()) && app.properties().url().startsWith("http");
-            getNodeActionByName(ACTION_OPEN_IN_BROWSER).setEnabled(hasURL && running);
-            getNodeActionByName(AzureActionEnum.START.getName()).setEnabled(stopped);
-            getNodeActionByName(AzureActionEnum.STOP.getName()).setEnabled(!stopped && !unknown && !allocating);
-            getNodeActionByName(AzureActionEnum.RESTART.getName()).setEnabled(!stopped && !unknown && !allocating);
-        } else {
-            getNodeActionByName(ACTION_OPEN_IN_BROWSER).setEnabled(false);
-            getNodeActionByName(AzureActionEnum.START.getName()).setEnabled(false);
-            getNodeActionByName(AzureActionEnum.STOP.getName()).setEnabled(false);
-            getNodeActionByName(AzureActionEnum.RESTART.getName()).setEnabled(false);
-        }
-    }
-
-    private void fillData(AppResourceInner newApp, DeploymentResourceInner deploy) {
-        this.status = deploy == null ? DeploymentResourceStatus.UNKNOWN : deploy.properties().status();
-        this.app = newApp;
-        this.deploy = deploy;
-        this.setIconPath(getIconForStatus(status));
-        this.setName(String.format("%s - %s", app.name(), getStatusDisplay(status)));
-        if (getNodeActionByName(AzureActionEnum.START.getName()) == null) {
-            loadActions();
-        }
-        syncActionState();
-    }
-
-    private void delete() {
-        AzureSpringCloudMvpModel.deleteApp(this.id).await();
-        SpringCloudMonitorUtil.awaitAndMonitoringStatus(id, null);
-    }
-
-    private void start() {
-        AzureSpringCloudMvpModel.startApp(app.id(), app.properties().activeDeploymentName()).await();
-        SpringCloudMonitorUtil.awaitAndMonitoringStatus(app.id(), status);
-    }
-
-    private void stop() {
-        AzureSpringCloudMvpModel.stopApp(app.id(), app.properties().activeDeploymentName()).await();
-        SpringCloudMonitorUtil.awaitAndMonitoringStatus(app.id(), status);
-    }
-
-    private void restart() {
-        AzureSpringCloudMvpModel.restartApp(app.id(), app.properties().activeDeploymentName()).await();
-        SpringCloudMonitorUtil.awaitAndMonitoringStatus(app.id(), status);
-    }
-
-    private void openInPortal() {
-        openResourcesInPortal(getSubscriptionId(), getAppId());
-    }
-
-    private void showProperties() {
-        DefaultLoader.getUIHelper().openSpringCloudAppPropertyView(SpringCloudAppNode.this);
-        // add this statement for false updating notice to update Property view
-        // immediately
-        SpringCloudStateManager.INSTANCE.notifySpringAppUpdate(clusterId,
-                app, deploy);
-    }
-
-    private void openInBrowser() {
-        if (StringUtils.isNotEmpty(app.properties().url())) {
-            DefaultLoader.getUIHelper().openInBrowser(app.properties().url());
-        } else {
-            DefaultLoader.getUIHelper().showInfo(this, "Public url is not available for app: " + app.name());
-        }
-    }
-
 }

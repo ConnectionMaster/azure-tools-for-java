@@ -1,23 +1,6 @@
 /*
- * Copyright (c) Microsoft Corporation
- *
- * All rights reserved.
- *
- * MIT License
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
- * documentation files (the "Software"), to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and
- * to permit persons to whom the Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all copies or substantial portions of
- * the Software.
- *
- * THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
- * THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Licensed under the MIT License. See License.txt in the project root for license information.
  */
 
 package com.microsoft.azure.toolkit.intellij.mysql.creation;
@@ -25,8 +8,10 @@ package com.microsoft.azure.toolkit.intellij.mysql.creation;
 import com.microsoft.azure.toolkit.intellij.common.AzureFormPanel;
 import com.microsoft.azure.toolkit.intellij.common.AzurePasswordFieldInput;
 import com.microsoft.azure.toolkit.intellij.common.TextDocumentListenerAdapter;
-import com.microsoft.azure.toolkit.intellij.mysql.AdminUsernameTextField;
-import com.microsoft.azure.toolkit.intellij.mysql.ServerNameTextField;
+import com.microsoft.azure.toolkit.intellij.database.AdminUsernameTextField;
+import com.microsoft.azure.toolkit.intellij.database.PasswordUtils;
+import com.microsoft.azure.toolkit.intellij.database.ServerNameTextField;
+import com.microsoft.azure.toolkit.intellij.mysql.MySQLNameValidator;
 import com.microsoft.azure.toolkit.lib.common.form.AzureFormInput;
 import com.microsoft.azure.toolkit.lib.mysql.AzureMySQLConfig;
 import lombok.Getter;
@@ -52,7 +37,7 @@ public class MySQLCreationBasicPanel extends JPanel implements AzureFormPanel<Az
     private AzurePasswordFieldInput passwordFieldInput;
     private AzurePasswordFieldInput confirmPasswordFieldInput;
 
-    private AzureMySQLConfig config;
+    private final AzureMySQLConfig config;
 
     MySQLCreationBasicPanel(AzureMySQLConfig config) {
         super();
@@ -64,10 +49,12 @@ public class MySQLCreationBasicPanel extends JPanel implements AzureFormPanel<Az
     }
 
     private void init() {
-        serverNameTextField.setSubscription(config.getSubscription());
-        serverNameTextField.setResourceGroup(config.getResourceGroup());
+        serverNameTextField.setSubscriptionId(config.getSubscription().getId());
         passwordFieldInput = PasswordUtils.generatePasswordFieldInput(this.passwordField, this.adminUsernameTextField);
         confirmPasswordFieldInput = PasswordUtils.generateConfirmPasswordFieldInput(this.confirmPasswordField, this.passwordField);
+        serverNameTextField.setMinLength(3);
+        serverNameTextField.setMaxLength(63);
+        serverNameTextField.setValidateFunction(new MySQLNameValidator());
     }
 
     private void initListeners() {

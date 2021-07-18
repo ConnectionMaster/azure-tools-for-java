@@ -35,44 +35,51 @@ import com.intellij.openapi.project.Project
 import com.intellij.packaging.impl.artifacts.ArtifactUtil
 import com.intellij.packaging.impl.run.BuildArtifactsBeforeRunTaskProvider.setBuildArtifactBeforeRun
 import com.microsoft.azure.arcadia.sdk.common.livy.interactive.MfaEspSparkSession
+import com.microsoft.azure.hdinsight.common.AbfsUri
 import com.microsoft.azure.hdinsight.common.ClusterManagerEx
+import com.microsoft.azure.hdinsight.common.WasbUri
+import com.microsoft.azure.hdinsight.common.logger.ILogger
 import com.microsoft.azure.hdinsight.sdk.cluster.IClusterDetail
 import com.microsoft.azure.hdinsight.sdk.cluster.LivyCluster
 import com.microsoft.azure.hdinsight.sdk.cluster.MfaEspCluster
 import com.microsoft.azure.hdinsight.sdk.common.livy.interactive.SparkSession
 import com.microsoft.azure.hdinsight.spark.common.Deployable
 import com.microsoft.azure.hdinsight.spark.common.SparkSubmitModel
+import com.microsoft.azure.hdinsight.spark.common.SparkSubmitStorageType
 import com.microsoft.azure.hdinsight.spark.run.SparkBatchJobDeployFactory
 import com.microsoft.azure.hdinsight.spark.run.configuration.LivySparkBatchJobRunConfiguration
 import com.microsoft.azure.hdinsight.spark.run.configuration.RunProfileStatePrepare
+import org.apache.commons.lang3.exception.ExceptionUtils
 import rx.Observable
 import java.net.URI
+import java.util.*
 import java.util.AbstractMap.SimpleImmutableEntry
 
 open class SparkScalaLivyConsoleRunConfiguration(project: Project,
                                                  configurationFactory: SparkScalaLivyConsoleRunConfigurationFactory,
                                                  private val batchRunConfiguration: LivySparkBatchJobRunConfiguration?,
                                                  name: String)
-    : RunProfileStatePrepare<SparkScalaLivyConsoleRunConfiguration>, AbstractRunConfiguration (
-        name, batchRunConfiguration?.configurationModule ?: RunConfigurationModule(project), configurationFactory)
-{
+    : RunProfileStatePrepare<SparkScalaLivyConsoleRunConfiguration>, ILogger, AbstractRunConfiguration(
+        name, batchRunConfiguration?.configurationModule ?: RunConfigurationModule(project), configurationFactory) {
     open val runConfigurationTypeName = "HDInsight Spark Run Configuration"
 
-    protected val submitModel : SparkSubmitModel?
+    protected val submitModel: SparkSubmitModel?
         get() = batchRunConfiguration?.submitModel
 
     private var deployDelegate: Deployable? = null
 
-    private val clusterName : String
+    private val clusterName: String
         get() = submitModel?.submissionParameter?.clusterName
-            ?: throw RuntimeConfigurationWarning("A $runConfigurationTypeName should be selected to start a console")
+                ?: throw RuntimeConfigurationWarning("A(n) $runConfigurationTypeName should be selected to start a console")
 
     private var cluster: IClusterDetail? = null
 
     open fun findCluster(clusterName: String): IClusterDetail = ClusterManagerEx.getInstance()
             .getClusterDetailByName(clusterName)
-            .orElseThrow { RuntimeConfigurationError(
-                    "Can't prepare Spark Livy interactive session since the target cluster isn't set or found") }
+            .orElseThrow {
+                RuntimeConfigurationError(
+                        "Can't prepare Spark Livy interactive session since the target cluster isn't set or found")
+            }
 
     private val consoleBuilder: SparkScalaConsoleBuilder
         get() {
@@ -128,14 +135,41 @@ open class SparkScalaLivyConsoleRunConfiguration(project: Project,
     }
 
     private val batchSubmitModel: SparkSubmitModel
-            get() = this.batchRunConfiguration?.submitModel
-                    ?: throw RuntimeConfigurationError("Can't find Spark batch job configuration to inherit")
+        get() = this.batchRunConfiguration?.submitModel
+                ?: throw RuntimeConfigurationError("Can't find Spark batch job configuration to inherit")
+
+    protected open fun transformToGen2Uri(url: String?): String? {
+        return if (AbfsUri.isType(url)) AbfsUri.parse(url).uri.toString() else url
+    }
 
     open fun applyRunConfiguration(sparkCluster: IClusterDetail, session: SparkSession, deploy: Deployable) {
         session.createParameters
-                .referJars(*batchSubmitModel.referenceJars.toTypedArray())
-                .referFiles(*batchSubmitModel.referenceFiles.toTypedArray())
-                .conf(batchSubmitModel.jobConfigs.map { SimpleImmutableEntry(it[0], it[1]) })
+                .referJars(*batchSubmitModel.referenceJars.map { url -> transformToGen2Uri(url) }.toTypedArray())
+                .referFiles(*batchSubmitModel.referenceFiles.map { url -> transformToGen2Uri(url) }.toTypedArray())
+
+        if (batchSubmitModel.jobUploadStorageModel.storageAccountType == SparkSubmitStorageType.BLOB) {
+            try {
+                val fsRoot = WasbUri.parse(batchSubmitModel.jobUploadStorageModel.uploadPath)
+                val storageKey = batchSubmitModel.jobUploadStorageModel.storageKey
+                val updatedStorageConfig = batchSubmitModel.jobConfigs.map { SimpleImmutableEntry(it[0], it[1]) }.toMutableList().apply {
+                    // We need the following config to fix issue https://github.com/microsoft/azure-tools-for-java/issues/5002
+                    add(SimpleImmutableEntry("spark.hadoop." + fsRoot.hadoopBlobFsPropertyKey, storageKey))
+                    add(SimpleImmutableEntry("spark.hadoop." + fsRoot.keyProviderPropertyKey, fsRoot.defaultKeyProviderPropertyValue))
+                }
+                session.createParameters.conf(updatedStorageConfig)
+            } catch (error: UnknownFormatConversionException) {
+                val errorHint = "Azure blob storage uploading path is not in correct format"
+                log().warn(String.format("%s. Uploading Path: %s. Error message: %s. Stacktrace:\n%s",
+                        errorHint, batchSubmitModel.jobUploadStorageModel.uploadPath, error.message,
+                        ExceptionUtils.getStackTrace(error)))
+                throw RuntimeConfigurationError(errorHint)
+            } catch (error: Exception) {
+                val errorHint = "Failed to update config for linked Azure Blob storage"
+                log().warn(String.format("%s. Error message: %s. Stacktrace:\n%s",
+                        errorHint, error.message, ExceptionUtils.getStackTrace(error)))
+                throw RuntimeConfigurationError(errorHint)
+            }
+        }
 
         batchSubmitModel.artifactPath.ifPresent {
             session.deploy = deploy

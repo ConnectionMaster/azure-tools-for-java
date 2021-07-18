@@ -1,23 +1,6 @@
 /*
- * Copyright (c) Microsoft Corporation
- *
- * All rights reserved.
- *
- * MIT License
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
- * documentation files (the "Software"), to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and
- * to permit persons to whom the Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all copies or substantial portions of
- * the Software.
- *
- * THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
- * THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Licensed under the MIT License. See License.txt in the project root for license information.
  */
 
 package com.microsoft.tooling.msservices.serviceexplorer;
@@ -57,6 +40,8 @@ public final class AzureIconSymbol {
 
         AzureIconSymbol OPEN_IN_PORTAL = fillInPath("Common/OpenInPortal.svg");
         AzureIconSymbol SHOW_PROPERTIES = fillInPath("Common/ShowProperties.svg");
+
+        AzureIconSymbol APACHE_SPARK_FAILURE_DEBUG = fillInPath("Common/ApacheSparkFailureDebug.svg");
     }
 
     public interface MySQL {
@@ -72,6 +57,18 @@ public final class AzureIconSymbol {
 
     }
 
+    public interface SqlServer {
+
+        AzureIconSymbol MODULE = fillInPath("SqlServer/SqlServer.svg");
+
+        AzureIconSymbol RUNNING = fillInPath("SqlServer/SqlServerRunning.svg");
+        AzureIconSymbol STOPPED = fillInPath("SqlServer/SqlServerStopped.svg");
+        AzureIconSymbol UPDATING = fillInPath("SqlServer/SqlServerUpdating.svg");
+
+        AzureIconSymbol CONNECT_TO_SERVER = fillInPath("SqlServer/ConnectToServer.svg");
+        AzureIconSymbol BIND_INTO = fillInPath("SqlServer/BindInto.svg");
+    }
+
     public interface WebApp {
 
         AzureIconSymbol MODULE = fillInPath("WebApp/WebApp.svg");
@@ -82,6 +79,8 @@ public final class AzureIconSymbol {
         AzureIconSymbol RUNNING_ON_LINUX = fillInPath("WebApp/WebAppRunningOnLinux.svg");
         AzureIconSymbol STOPPED_ON_LINUX = fillInPath("WebApp/WebAppStoppedOnLinux.svg");
         AzureIconSymbol UPDATING_ON_LINUX = fillInPath("WebApp/WebAppUpdatingOnLinux.svg");
+
+        AzureIconSymbol DEPLOY = fillInPath("WebApp/Deploy.svg");
     }
 
     public interface DeploymentSlot {
@@ -104,6 +103,9 @@ public final class AzureIconSymbol {
         AzureIconSymbol RUNNING = fillInPath("FunctionApp/FunctionAppRunning.svg");
         AzureIconSymbol STOPPED = fillInPath("FunctionApp/FunctionAppStopped.svg");
         AzureIconSymbol UPDATING = fillInPath("FunctionApp/FunctionAppUpdating.svg");
+
+        AzureIconSymbol RUN = fillInPath("FunctionApp/Run.svg");
+        AzureIconSymbol DEPLOY = fillInPath("FunctionApp/Deploy.svg");
     }
 
     public interface SpringCloud {
@@ -118,6 +120,9 @@ public final class AzureIconSymbol {
         AzureIconSymbol FAILED = fillInPath("SpringCloud/SpringCloudAppFailed.svg");
         AzureIconSymbol PENDING = fillInPath("SpringCloud/SpringCloudAppPending.svg");
         AzureIconSymbol UNKNOWN = fillInPath("SpringCloud/SpringCloudAppUnknown.svg");
+
+        AzureIconSymbol DEPLOY = fillInPath("SpringCloud/Deploy.svg");
+        AzureIconSymbol ADD_DEPENDENCY = fillInPath("SpringCloud/AddDependency.svg");
     }
 
     public interface ApacheSparkOnAzureSynapse {
@@ -171,6 +176,15 @@ public final class AzureIconSymbol {
     public interface SQLServerBigDataCluster {
 
         AzureIconSymbol MODULE = fillInPath("SQLServerBigDataCluster/SqlServerBigDataCluster.svg");
+    }
+
+    public interface DockerSupport {
+
+        AzureIconSymbol MODULE = fillInPath("DockerSupport/DockerSupport.svg");
+
+        AzureIconSymbol RUN = fillInPath("DockerSupport/Run.svg");
+        AzureIconSymbol PUSH_IMAGE = fillInPath("DockerSupport/PushImage.svg");
+        AzureIconSymbol RUN_ON_WEB_APP = fillInPath("DockerSupport/RunOnWebApp.svg");
     }
 
     public static AzureIconSymbol fromPath(String path) {

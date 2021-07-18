@@ -1,28 +1,13 @@
 /*
- * Copyright (c) Microsoft Corporation
- *
- * All rights reserved.
- *
- * MIT License
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
- * documentation files (the "Software"), to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and
- * to permit persons to whom the Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all copies or substantial portions of
- * the Software.
- *
- * THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
- * THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Licensed under the MIT License. See License.txt in the project root for license information.
  */
 
 package com.microsoft.azure.toolkit.intellij.appservice.action;
 
 import com.jediterm.terminal.TerminalDataStream;
+import com.microsoft.azure.toolkit.lib.appservice.model.OperatingSystem;
+import com.microsoft.azure.toolkit.lib.appservice.model.Runtime;
 import com.microsoft.azuretools.utils.AzureCliUtils;
 import com.microsoft.azuretools.utils.CommandUtils;
 import com.microsoft.intellij.util.PatternUtils;
@@ -59,7 +44,7 @@ public enum SSHTerminalManager {
      * @param fxVersion
      * @return
      */
-    public boolean beforeExecuteAzCreateRemoteConnection(String subscriptionId, String os, String fxVersion) {
+    public boolean beforeExecuteAzCreateRemoteConnection(String subscriptionId, Runtime runtime) {
         try {
             // check to confirm that azure cli is installed.
             if (!AzureCliUtils.isCliInstalled()) {
@@ -76,12 +61,11 @@ public enum SSHTerminalManager {
             return false;
         }
         // only support these web app those os is linux.
-        if (!OS_LINUX.equalsIgnoreCase(os)) {
+        if (runtime.getOperatingSystem() == OperatingSystem.WINDOWS) {
             DefaultLoader.getUIHelper().showError(SSH_INTO_WEB_APP_ERROR_MESSAGE_NOT_SUPPORT_WINDOWS, SSH_INTO_WEB_APP_ERROR_DIALOG_TITLE);
             return false;
         }
-        // check non-docker web app
-        if (StringUtils.containsIgnoreCase(fxVersion, WEB_APP_DOCKER_PREFIX)) {
+        if (runtime.getOperatingSystem() == OperatingSystem.DOCKER) {
             DefaultLoader.getUIHelper().showError(SSH_INTO_WEB_APP_ERROR_MESSAGE_NOT_SUPPORT_DOCKER, SSH_INTO_WEB_APP_ERROR_DIALOG_TITLE);
             return false;
         }

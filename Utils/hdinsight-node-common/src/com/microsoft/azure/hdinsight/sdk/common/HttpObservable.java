@@ -1,23 +1,6 @@
 /*
- * Copyright (c) Microsoft Corporation
- *
- * All rights reserved.
- *
- * MIT License
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
- * documentation files (the "Software"), to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and
- * to permit persons to whom the Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all copies or substantial portions of
- * the Software.
- *
- * THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
- * THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Licensed under the MIT License. See License.txt in the project root for license information.
  */
 
 package com.microsoft.azure.hdinsight.sdk.common;
@@ -199,7 +182,6 @@ public class HttpObservable implements ILogger {
         return this;
     }
 
-    @Nullable
     public Header[] getDefaultHeaders() throws IOException {
         return defaultHeaders.getAllHeaders();
     }
@@ -368,8 +350,8 @@ public class HttpObservable implements ILogger {
      */
     public Observable<CloseableHttpResponse> request(@NotNull final HttpRequestBase httpRequest,
                                                      @Nullable final HttpEntity entity,
-                                                     @Nullable final List<NameValuePair> parameters,
-                                                     @Nullable final List<Header> addOrReplaceHeaders) {
+                                                     final List<NameValuePair> parameters,
+                                                     final List<Header> addOrReplaceHeaders) {
         return Observable.fromCallable(() -> {
             URIBuilder builder = new URIBuilder(httpRequest.getURI());
 
@@ -404,8 +386,8 @@ public class HttpObservable implements ILogger {
      */
     public Observable<HttpResponse> requestWithHttpResponse(@NotNull final HttpRequestBase httpRequest,
                                                             @Nullable final HttpEntity entity,
-                                                            @Nullable final List<NameValuePair> parameters,
-                                                            @Nullable final List<Header> addOrReplaceHeaders) {
+                                                            final List<NameValuePair> parameters,
+                                                            final List<Header> addOrReplaceHeaders) {
         return request(httpRequest, entity, parameters, addOrReplaceHeaders)
                 .flatMap(HttpObservable::toStringOnlyOkResponse);
     }
@@ -417,8 +399,8 @@ public class HttpObservable implements ILogger {
     }
 
     public <T> Observable<T> get(@NotNull final String uri,
-                                 @Nullable final List<NameValuePair> parameters,
-                                 @Nullable final List<Header> addOrReplaceHeaders,
+                                 final List<NameValuePair> parameters,
+                                 final List<Header> addOrReplaceHeaders,
                                  @NotNull final Class<T> clazz) {
         return requestWithHttpResponse(new HttpGet(uri), null, parameters, addOrReplaceHeaders)
                 .map(resp -> this.convertJsonResponseToObject(resp, clazz));
@@ -426,8 +408,8 @@ public class HttpObservable implements ILogger {
 
     public <T> Observable<T> put(@NotNull final String uri,
                                  @Nullable final HttpEntity entity,
-                                 @Nullable final List<NameValuePair> parameters,
-                                 @Nullable final List<Header> addOrReplaceHeaders,
+                                 final List<NameValuePair> parameters,
+                                 final List<Header> addOrReplaceHeaders,
                                  @NotNull final Class<T> clazz) {
         return requestWithHttpResponse(new HttpPut(uri), entity, parameters, addOrReplaceHeaders)
                 .map(resp -> this.convertJsonResponseToObject(resp, clazz));
@@ -435,23 +417,23 @@ public class HttpObservable implements ILogger {
 
     public <T> Observable<T> post(@NotNull final String uri,
                                   @Nullable final HttpEntity entity,
-                                  @Nullable final List<NameValuePair> parameters,
-                                  @Nullable final List<Header> addOrReplaceHeaders,
+                                  final List<NameValuePair> parameters,
+                                  final List<Header> addOrReplaceHeaders,
                                   @NotNull final Class<T> clazz) {
         return requestWithHttpResponse(new HttpPost(uri), entity, parameters, addOrReplaceHeaders)
                 .map(resp -> this.convertJsonResponseToObject(resp, clazz));
     }
 
     public Observable<HttpResponse> delete(@NotNull final String uri,
-                                           @Nullable final List<NameValuePair> parameters,
-                                           @Nullable final List<Header> addOrReplaceHeaders) {
+                                           final List<NameValuePair> parameters,
+                                           final List<Header> addOrReplaceHeaders) {
         return requestWithHttpResponse(new HttpDelete(uri), null, parameters, addOrReplaceHeaders);
     }
 
     public <T> Observable<T> patch(@NotNull final String uri,
                                    @Nullable final HttpEntity entity,
-                                   @Nullable final List<NameValuePair> parameters,
-                                   @Nullable final List<Header> addOrReplaceHeaders,
+                                   final List<NameValuePair> parameters,
+                                   final List<Header> addOrReplaceHeaders,
                                    @NotNull final Class<T> clazz) {
         return requestWithHttpResponse(new HttpPatch(uri), entity, parameters, addOrReplaceHeaders)
                 .map(resp -> this.convertJsonResponseToObject(resp, clazz));

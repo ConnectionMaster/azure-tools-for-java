@@ -1,42 +1,9 @@
 /*
- * Copyright (c) Microsoft Corporation
- *
- * All rights reserved.
- *
- * MIT License
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
- * documentation files (the "Software"), to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and
- * to permit persons to whom the Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all copies or substantial portions of
- * the Software.
- *
- * THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
- * THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Licensed under the MIT License. See License.txt in the project root for license information.
  */
 
 package com.microsoft.azure.toolkit.intellij.webapp;
-
-import java.awt.event.ActionEvent;
-import java.util.LinkedHashMap;
-import java.util.Map;
-
-import javax.swing.BorderFactory;
-import javax.swing.JButton;
-import javax.swing.JComponent;
-import javax.swing.JLabel;
-import javax.swing.JPanel;
-import javax.swing.JTextField;
-import javax.swing.ListSelectionModel;
-import javax.swing.table.DefaultTableModel;
-
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 import com.intellij.icons.AllIcons;
 import com.intellij.openapi.actionSystem.ActionToolbarPosition;
@@ -44,7 +11,6 @@ import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.fileChooser.FileChooser;
 import com.intellij.openapi.fileChooser.FileChooserDescriptor;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.ui.MessageType;
 import com.intellij.openapi.util.Comparing;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.wm.StatusBar;
@@ -54,14 +20,24 @@ import com.intellij.ui.HideableDecorator;
 import com.intellij.ui.HyperlinkLabel;
 import com.intellij.ui.ToolbarDecorator;
 import com.intellij.ui.table.JBTable;
-import com.microsoft.azure.management.appservice.OperatingSystem;
-import com.microsoft.azuretools.core.mvp.ui.webapp.WebAppProperty;
 import com.microsoft.azure.toolkit.intellij.common.BaseEditor;
+import com.microsoft.azure.toolkit.lib.appservice.model.OperatingSystem;
+import com.microsoft.azure.toolkit.lib.common.messager.AzureMessager;
+import com.microsoft.azuretools.core.mvp.ui.webapp.WebAppProperty;
+import com.microsoft.azuretools.telemetry.TelemetryConstants;
+import com.microsoft.azuretools.telemetrywrapper.EventUtil;
 import com.microsoft.intellij.ui.components.AzureActionListenerWrapper;
-import com.microsoft.intellij.ui.util.UIUtils;
 import com.microsoft.tooling.msservices.serviceexplorer.azure.webapp.WebAppBasePropertyMvpView;
 import com.microsoft.tooling.msservices.serviceexplorer.azure.webapp.WebAppPropertyViewPresenter;
 import com.microsoft.tooling.msservices.serviceexplorer.azure.webapp.base.WebAppBasePropertyViewPresenter;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
+import java.awt.event.ActionEvent;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 public abstract class WebAppBasePropertyView extends BaseEditor implements WebAppBasePropertyMvpView {
     public final String id;
@@ -103,10 +79,8 @@ public abstract class WebAppBasePropertyView extends BaseEditor implements WebAp
     private JTextField txtPricingTier;
     private JTextField txtJavaVersion;
     private JTextField txtContainer;
-    private JTextField txtContainerVersion;
     private JLabel lblJavaVersion;
     private JLabel lblContainer;
-    private JLabel lblContainerVersion;
     private JBTable tblAppSetting;
     private DefaultTableModel tableModel;
     private AnActionButton btnAdd;
@@ -137,19 +111,21 @@ public abstract class WebAppBasePropertyView extends BaseEditor implements WebAp
         btnGetPublishFile.addActionListener(new AzureActionListenerWrapper(INSIGHT_NAME, "btnGetPublishFile", null) {
             @Override
             public void actionPerformedFunc(ActionEvent event) {
-                FileChooserDescriptor fileChooserDescriptor = new FileChooserDescriptor(
+                EventUtil.executeWithLog(TelemetryConstants.APP_SERVICE, TelemetryConstants.GET_PUBLISH_FILE, operation -> {
+                    FileChooserDescriptor fileChooserDescriptor = new FileChooserDescriptor(
                         false /*chooseFiles*/,
                         true /*chooseFolders*/,
                         false /*chooseJars*/,
                         false /*chooseJarsAsFiles*/,
                         false /*chooseJarContents*/,
                         false /*chooseMultiple*/
-                );
-                fileChooserDescriptor.setTitle(FILE_SELECTOR_TITLE);
-                final VirtualFile file = FileChooser.chooseFile(fileChooserDescriptor, null, null);
-                if (file != null) {
-                    presenter.onGetPublishingProfileXmlWithSecrets(sid, resId, slotName, file.getPath());
-                }
+                    );
+                    fileChooserDescriptor.setTitle(FILE_SELECTOR_TITLE);
+                    final VirtualFile file = FileChooser.chooseFile(fileChooserDescriptor, null, null);
+                    if (file != null) {
+                        presenter.onGetPublishingProfileXmlWithSecrets(sid, resId, slotName, file.getPath());
+                    }
+                });
             }
         });
 
@@ -168,8 +144,10 @@ public abstract class WebAppBasePropertyView extends BaseEditor implements WebAp
         btnSave.addActionListener(new AzureActionListenerWrapper(INSIGHT_NAME, "btnSave", null) {
             @Override
             public void actionPerformedFunc(ActionEvent event) {
-                setBtnEnableStatus(false);
-                presenter.onUpdateWebAppProperty(sid, resId, slotName, cachedAppSettings, editedAppSettings);
+                EventUtil.executeWithLog(TelemetryConstants.APP_SERVICE, TelemetryConstants.SAVE_APP_SERVICE, operation -> {
+                    setBtnEnableStatus(false);
+                    presenter.onUpdateWebAppProperty(sid, resId, slotName, cachedAppSettings, editedAppSettings);
+                });
             }
         });
 
@@ -315,23 +293,16 @@ public abstract class WebAppBasePropertyView extends BaseEditor implements WebAp
                             ? TXT_NA : (String) webAppProperty.getValue(WebAppPropertyViewPresenter.KEY_JAVA_VERSION));
                     txtContainer.setText(webAppProperty.getValue(WebAppPropertyViewPresenter.KEY_JAVA_CONTAINER) == null
                             ? TXT_NA : (String) webAppProperty.getValue(WebAppPropertyViewPresenter.KEY_JAVA_CONTAINER));
-                    txtContainerVersion.setText(webAppProperty
-                            .getValue(WebAppPropertyViewPresenter.KEY_JAVA_CONTAINER_VERSION) == null ? TXT_NA
-                            : (String) webAppProperty.getValue(WebAppPropertyViewPresenter.KEY_JAVA_CONTAINER_VERSION));
                     txtJavaVersion.setVisible(true);
                     txtContainer.setVisible(true);
-                    txtContainerVersion.setVisible(true);
                     lblJavaVersion.setVisible(true);
                     lblContainer.setVisible(true);
-                    lblContainerVersion.setVisible(true);
                     break;
                 case LINUX:
                     txtJavaVersion.setVisible(false);
                     txtContainer.setVisible(false);
-                    txtContainerVersion.setVisible(false);
                     lblJavaVersion.setVisible(false);
                     lblContainer.setVisible(false);
-                    lblContainerVersion.setVisible(false);
                     break;
                 default:
                     break;
@@ -359,16 +330,16 @@ public abstract class WebAppBasePropertyView extends BaseEditor implements WebAp
         setBtnEnableStatus(true);
         if (isSuccess) {
             updateMapStatus(cachedAppSettings, editedAppSettings);
-            UIUtils.showNotification(statusBar, NOTIFY_PROPERTY_UPDATE_SUCCESS, MessageType.INFO);
+            AzureMessager.getMessager().success(NOTIFY_PROPERTY_UPDATE_SUCCESS);
         }
     }
 
     @Override
     public void showGetPublishingProfileResult(boolean isSuccess) {
         if (isSuccess) {
-            UIUtils.showNotification(statusBar, NOTIFY_PROFILE_GET_SUCCESS, MessageType.INFO);
+            AzureMessager.getMessager().success(NOTIFY_PROFILE_GET_SUCCESS);
         } else {
-            UIUtils.showNotification(statusBar, NOTIFY_PROFILE_GET_FAIL, MessageType.ERROR);
+            AzureMessager.getMessager().error(NOTIFY_PROFILE_GET_FAIL);
         }
     }
 
@@ -412,7 +383,6 @@ public abstract class WebAppBasePropertyView extends BaseEditor implements WebAp
         txtPricingTier.setBorder(BorderFactory.createEmptyBorder());
         txtJavaVersion.setBorder(BorderFactory.createEmptyBorder());
         txtContainer.setBorder(BorderFactory.createEmptyBorder());
-        txtContainerVersion.setBorder(BorderFactory.createEmptyBorder());
 
         txtResourceGroup.setBackground(null);
         txtStatus.setBackground(null);
@@ -422,7 +392,6 @@ public abstract class WebAppBasePropertyView extends BaseEditor implements WebAp
         txtPricingTier.setBackground(null);
         txtJavaVersion.setBackground(null);
         txtContainer.setBackground(null);
-        txtContainerVersion.setBackground(null);
     }
 
     private void $$$setupUI$$$() {

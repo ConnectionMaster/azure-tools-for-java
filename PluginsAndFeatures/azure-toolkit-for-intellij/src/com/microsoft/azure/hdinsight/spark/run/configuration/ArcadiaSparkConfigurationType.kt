@@ -24,18 +24,14 @@ package com.microsoft.azure.hdinsight.spark.run.configuration
 
 import com.intellij.execution.configurations.ConfigurationFactory
 import com.intellij.execution.configurations.ConfigurationType
-import com.microsoft.azure.hdinsight.common.CommonConst
-import com.microsoft.azure.hdinsight.common.IconPathBuilder
-import com.microsoft.azuretools.authmanage.CommonSettings
-import com.microsoft.intellij.util.PluginUtil
+import com.microsoft.intellij.helpers.AzureIconLoader
+import com.microsoft.tooling.msservices.serviceexplorer.AzureIconSymbol
 import javax.swing.Icon
 
 object ArcadiaSparkConfigurationType : ConfigurationType {
     override fun getIcon(): Icon {
         // TODO: should use Arcadia config icon
-        return PluginUtil.getIcon(IconPathBuilder
-                .custom(CommonConst.ARCADIA_OPEN_UI_NAME)
-                .build())
+        return AzureIconLoader.loadIcon(AzureIconSymbol.ApacheSparkOnAzureSynapse.MODULE);
     }
 
     override fun getDisplayName(): String {

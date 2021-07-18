@@ -1,55 +1,31 @@
 /*
- * Copyright (c) Microsoft Corporation
- *
- * All rights reserved.
- *
- * MIT License
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
- * documentation files (the "Software"), to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and
- * to permit persons to whom the Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all copies or substantial portions of
- * the Software.
- *
- * THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
- * THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Licensed under the MIT License. See License.txt in the project root for license information.
  */
 
 package com.microsoft.tooling.msservices.serviceexplorer.azure.function;
 
-import com.microsoft.azure.management.appservice.FunctionApp;
+import com.microsoft.azure.toolkit.lib.Azure;
+import com.microsoft.azure.toolkit.lib.appservice.AzureAppService;
+import com.microsoft.azure.toolkit.lib.appservice.service.IFunctionApp;
 import com.microsoft.azure.toolkit.lib.common.operation.AzureOperation;
-import com.microsoft.azuretools.azurecommons.helpers.NotNull;
 import com.microsoft.azuretools.azurecommons.helpers.Nullable;
-import com.microsoft.azuretools.core.mvp.model.ResourceEx;
 import com.microsoft.azuretools.utils.AzureUIRefreshCore;
 import com.microsoft.azuretools.utils.AzureUIRefreshListener;
 import com.microsoft.tooling.msservices.serviceexplorer.AzureIconSymbol;
 import com.microsoft.tooling.msservices.serviceexplorer.AzureRefreshableNode;
 import com.microsoft.tooling.msservices.serviceexplorer.Node;
 
-import java.util.List;
-
-public class FunctionModule extends AzureRefreshableNode implements FunctionModuleView {
+public class FunctionModule extends AzureRefreshableNode {
     private static final String FUNCTION_SERVICE_MODULE_ID = FunctionModule.class.getName();
     private static final String ICON_PATH = "azure-functions-small.png";
-    private static final String BASE_MODULE_NAME = "Function App(Preview)";
+    private static final String BASE_MODULE_NAME = "Function App";
     private static final String FUNCTION_MODULE = "FunctionModule";
-    private static final String FAILED_TO_DELETE_FUNCTION_APP = "Failed to delete Function App %s";
-    private static final String ERROR_DELETING_FUNCTION_APP = "Azure Services Explorer - Error Deleting Function App";
-    private final FunctionModulePresenter<FunctionModule> functionModulePresenter;
 
     public static final String MODULE_NAME = "Function App";
 
     public FunctionModule(Node parent) {
         super(FUNCTION_SERVICE_MODULE_ID, BASE_MODULE_NAME, parent, ICON_PATH);
-        functionModulePresenter = new FunctionModulePresenter<>();
-        functionModulePresenter.onAttachView(FunctionModule.this);
         createListener();
     }
 
@@ -59,24 +35,18 @@ public class FunctionModule extends AzureRefreshableNode implements FunctionModu
     }
 
     @Override
-    @AzureOperation(value = "remove function app", type = AzureOperation.Type.ACTION)
+    @AzureOperation(name = "function.delete", params = {"nameFromResourceId(id)", "sid"}, type = AzureOperation.Type.ACTION)
     public void removeNode(String sid, String id, Node node) {
-        functionModulePresenter.onDeleteFunctionApp(sid, id);
+        Azure.az(AzureAppService.class).functionApp(id).delete();
         removeDirectChildNode(node);
     }
 
     @Override
-    public void renderChildren(@NotNull final List<ResourceEx<FunctionApp>> resourceExes) {
-        for (final ResourceEx<FunctionApp> resourceEx : resourceExes) {
-            final FunctionAppNode node = new FunctionAppNode(this, resourceEx.getSubscriptionId(), resourceEx.getResource());
-            addChildNode(node);
-        }
-    }
-
-    @Override
-    @AzureOperation(value = "reload function apps", type = AzureOperation.Type.ACTION)
+    @AzureOperation(name = "function.reload_all", type = AzureOperation.Type.ACTION)
     protected void refreshItems() {
-        functionModulePresenter.onModuleRefresh();
+        Azure.az(AzureAppService.class).functionApps(true)
+                .stream().map(functionApp -> new FunctionAppNode(FunctionModule.this, functionApp))
+                .forEach(this::addChildNode);
     }
 
     private void createListener() {
@@ -108,6 +78,6 @@ public class FunctionModule extends AzureRefreshableNode implements FunctionModu
     }
 
     private static boolean isFunctionModuleEvent(Object eventObject) {
-        return eventObject != null && eventObject instanceof FunctionApp;
+        return eventObject != null && eventObject instanceof IFunctionApp;
     }
 }

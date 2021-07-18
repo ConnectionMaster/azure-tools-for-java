@@ -29,7 +29,7 @@
         <relativePath>../pom.xml</relativePath>
         <groupId>com.microsoft.azuretools</groupId>
         <artifactId>utils</artifactId>
-        <version>3.49.0</version>
+        <version>3.55.0-SNAPSHOT</version>
     </parent>
     <artifactId>azuretools-core</artifactId>
     <properties>
@@ -59,10 +59,9 @@
         <testSourceDirectory>test</testSourceDirectory>
         <plugins>
             <plugin>
-                <!-- https://mvnrepository.com/artifact/org.codehaus.mojo/aspectj-maven-plugin -->
-                <groupId>org.codehaus.mojo</groupId>
+                <groupId>com.nickwongdev</groupId>
                 <artifactId>aspectj-maven-plugin</artifactId>
-                <version>1.11</version>
+                <version>1.12.6</version>
                 <configuration>
                     <showWeaveInfo>false</showWeaveInfo>
                     <source>1.8</source>
@@ -73,15 +72,23 @@
                     <verbose>false</verbose>
                     <outxml>true</outxml>
                     <forceAjcCompile>true</forceAjcCompile>
-                    <sources/><!-- this is important!-->
-                    <weaveDirectories>
-                        <weaveDirectory>${project.build.directory}/classes</weaveDirectory>
-                    </weaveDirectories>
+                    <sources /><!-- this is important!-->
+                    <aspectLibraries>
+                        <aspectLibrary>
+                            <groupId>com.microsoft.azure</groupId>
+                            <artifactId>azure-toolkit-common-lib</artifactId>
+                        </aspectLibrary>
+                    </aspectLibraries>
                 </configuration>
                 <executions>
                     <execution>
                         <id>compile-with-aspectj</id>
                         <phase>process-classes</phase>
+                        <configuration>
+                            <weaveDirectories>
+                                <weaveDirectory>${project.build.directory}/classes</weaveDirectory>
+                            </weaveDirectories>
+                        </configuration>
                         <goals>
                             <goal>compile</goal>
                         </goals>
@@ -89,14 +96,14 @@
                     <execution>
                         <id>test-compile-with-aspectj</id>
                         <phase>process-classes</phase>
-                        <goals>
-                            <goal>test-compile</goal>
-                        </goals>
                         <configuration>
                             <weaveDirectories>
                                 <weaveDirectory>${project.build.directory}/test-classes</weaveDirectory>
                             </weaveDirectories>
                         </configuration>
+                        <goals>
+                            <goal>test-compile</goal>
+                        </goals>
                     </execution>
                 </executions>
             </plugin>
@@ -171,12 +178,12 @@
             <artifactId>azure-security-keyvault-certificates</artifactId>
         </dependency>
         <dependency>
-            <groupId>com.microsoft.azure</groupId>
-            <artifactId>azure-auth-helper</artifactId>
-        </dependency>
-        <dependency>
             <groupId>com.microsoft.azure.applicationinsights.v2015_05_01</groupId>
             <artifactId>azure-mgmt-insights</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.jetbrains</groupId>
+            <artifactId>annotations</artifactId>
         </dependency>
         <dependency>
             <groupId>com.spotify</groupId>
@@ -186,6 +193,10 @@
         <dependency>
             <groupId>com.squareup.retrofit2</groupId>
             <artifactId>retrofit</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>log4j</groupId>
+            <artifactId>log4j</artifactId>
         </dependency>
         <dependency>
             <groupId>com.microsoft.azure</groupId>
@@ -257,17 +268,21 @@
             <artifactId>rxjava</artifactId>
         </dependency>
         <dependency>
-            <groupId>com.microsoft.azure.appplatform.v2020_07_01</groupId>
-            <artifactId>azure-mgmt-appplatform</artifactId>
+            <groupId>com.microsoft.azure</groupId>
+            <artifactId>azure-toolkit-common-lib</artifactId>
         </dependency>
-	<dependency>
-        <groupId>com.microsoft.azure.mysql.v2020_01_01</groupId>
-		<artifactId>azure-mgmt-mysql</artifactId>
-        <version>1.0.0-beta</version>
-	</dependency>
         <dependency>
             <groupId>com.microsoft.azure</groupId>
-            <artifactId>azure-tools-common</artifactId>
+            <artifactId>azure-toolkit-auth-lib</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.microsoft.azure</groupId>
+            <artifactId>azure-toolkit-appservice-lib</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>com.microsoft.azure</groupId>
+            <artifactId>azure-toolkit-resource-lib</artifactId>
         </dependency>
         <dependency>
             <groupId>junit</groupId>
@@ -281,11 +296,18 @@
         </dependency>
         <dependency>
             <groupId>org.powermock</groupId>
+            <artifactId>powermock-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.powermock</groupId>
             <artifactId>powermock-module-junit4</artifactId>
+            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.powermock</groupId>
             <artifactId>powermock-api-mockito2</artifactId>
+            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>com.google.code.gson</groupId>

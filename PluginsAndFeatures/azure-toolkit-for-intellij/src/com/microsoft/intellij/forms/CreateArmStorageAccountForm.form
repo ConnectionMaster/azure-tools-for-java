@@ -18,21 +18,17 @@
           <text value=""/>
         </properties>
       </component>
-      <component id="8a2d6" class="javax.swing.JComboBox" binding="subscriptionComboBox" default-binding="true">
+      <component id="7102f" class="com.microsoft.azure.toolkit.intellij.appservice.subscription.SubscriptionComboBox" binding="subscriptionComboBox" custom-create="true" default-binding="true">
         <constraints>
           <grid row="14" column="0" row-span="1" col-span="2" vsize-policy="0" hsize-policy="2" anchor="8" fill="1" indent="0" use-parent-layout="false"/>
         </constraints>
-        <properties>
-          <enabled value="false"/>
-          <model/>
-        </properties>
       </component>
       <component id="8237c" class="javax.swing.JLabel">
         <constraints>
           <grid row="13" column="0" row-span="1" col-span="2" vsize-policy="0" hsize-policy="0" anchor="8" fill="0" indent="0" use-parent-layout="false"/>
         </constraints>
         <properties>
-          <labelFor value="8a2d6"/>
+          <labelFor value="7102f"/>
           <text value="Subscription:"/>
         </properties>
       </component>
@@ -104,15 +100,14 @@
           <grid row="15" column="0" row-span="1" col-span="2" vsize-policy="0" hsize-policy="0" anchor="8" fill="0" indent="0" use-parent-layout="false"/>
         </constraints>
         <properties>
-          <labelFor value="3b986"/>
+          <labelFor value="d3e75"/>
           <text value="Location:"/>
         </properties>
       </component>
-      <component id="3b986" class="javax.swing.JComboBox" binding="regionComboBox">
+      <component id="d3e75" class="com.microsoft.azure.toolkit.intellij.appservice.region.RegionComboBox" binding="regionComboBox" custom-create="true">
         <constraints>
           <grid row="16" column="0" row-span="1" col-span="2" vsize-policy="0" hsize-policy="2" anchor="8" fill="1" indent="0" use-parent-layout="false"/>
         </constraints>
-        <properties/>
       </component>
       <component id="ce716" class="javax.swing.JRadioButton" binding="createNewRadioButton" default-binding="true">
         <constraints>

@@ -1,38 +1,26 @@
 /*
- * Copyright (c) Microsoft Corporation
- *
- * All rights reserved.
- *
- * MIT License
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
- * documentation files (the "Software"), to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and
- * to permit persons to whom the Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all copies or substantial portions of
- * the Software.
- *
- * THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
- * THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Licensed under the MIT License. See License.txt in the project root for license information.
  */
 
 package com.microsoft.intellij.util;
 
-import com.microsoft.azure.management.Azure;
-import com.microsoft.azure.management.appservice.CheckNameResourceTypes;
-import com.microsoft.azure.management.appservice.implementation.ResourceNameAvailabilityInner;
-import com.microsoft.azuretools.authmanage.AuthMethodManager;
-import com.microsoft.rest.RestException;
+import com.azure.core.management.exception.ManagementException;
+import com.azure.resourcemanager.AzureResourceManager;
+import com.azure.resourcemanager.appservice.fluent.models.ResourceNameAvailabilityInner;
+import com.azure.resourcemanager.appservice.models.CheckNameResourceTypes;
+import com.microsoft.azure.toolkit.lib.Azure;
+import com.microsoft.azure.toolkit.lib.appservice.AzureAppService;
+import com.microsoft.azure.toolkit.lib.common.model.ResourceGroup;
+import com.microsoft.azure.toolkit.lib.resource.AzureGroup;
+import com.microsoft.azure.toolkit.lib.springcloud.SpringCloudCluster;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -45,7 +33,8 @@ public class ValidationUtils {
     private static final String VERSION_REGEX = "[0-9]([\\.a-zA-Z0-9\\-_])*";
     private static final String AZURE_FUNCTION_NAME_REGEX = "[a-zA-Z]([a-zA-Z0-9\\-_])*";
     private static final String APP_SERVICE_PLAN_NAME_PATTERN = "[a-zA-Z0-9\\-]{1,40}";
-    private static final String AZURE_SPRING_CLOUD_APP_NAME_REGEX = "[a-z]([a-z0-9\\-_])*[a-z0-9]";
+    //refer: https://dev.azure.com/msazure/AzureDMSS/_git/AzureDMSS-PortalExtension?path=%2Fsrc%2FSpringCloudPortalExt%2FClient%2FCreateApplication%2FCreateApplicationBlade.ts&version=GBdev&line=463&lineEnd=463&lineStartColumn=25&lineEndColumn=55&lineStyle=plain&_a=contents
+    private static final String SPRING_CLOUD_APP_NAME_PATTERN = "^[a-z][a-z0-9-]{2,30}[a-z0-9]$";
     private static final String APP_INSIGHTS_NAME_INVALID_CHARACTERS = "[*;/?:@&=+$,<>#%\\\"\\{}|^'`\\\\\\[\\]]";
 
     private static Map<Pair<String, String>, String> appServiceNameValidationCache = new HashMap<>();
@@ -65,7 +54,7 @@ public class ValidationUtils {
 
     public static boolean isValidSpringCloudAppName(String name) {
         int len = name.trim().length();
-        return name != null && name.matches(AZURE_SPRING_CLOUD_APP_NAME_REGEX) && len >= 4 && len <= 32;
+        return name != null && name.matches(SPRING_CLOUD_APP_NAME_PATTERN) && len >= 4 && len <= 32;
     }
 
     public static boolean isValidVersion(String version) {
@@ -84,9 +73,9 @@ public class ValidationUtils {
         if (!isValidAppServiceName(appServiceName)) {
             cacheAndThrow(appServiceNameValidationCache, cacheKey, message("appService.subscription.validate.invalidName"));
         }
-        final Azure azure = AuthMethodManager.getInstance().getAzureManager().getAzure(subscriptionId);
-        final ResourceNameAvailabilityInner result = azure.appServices().inner()
-                .checkNameAvailability(appServiceName, CheckNameResourceTypes.MICROSOFT_WEBSITES);
+        final AzureResourceManager azureResourceManager = Azure.az(AzureAppService.class).getAzureResourceManager(subscriptionId);
+        final ResourceNameAvailabilityInner result = azureResourceManager.webApps().manager().serviceClient()
+                .getResourceProviders().checkNameAvailability(appServiceName, CheckNameResourceTypes.MICROSOFT_WEB_SITES);
         if (!result.nameAvailable()) {
             cacheAndThrow(appServiceNameValidationCache, cacheKey, result.message());
         }
@@ -105,12 +94,12 @@ public class ValidationUtils {
             cacheAndThrow(resourceGroupValidationCache, subscriptionId, message("appService.resourceGroup.validate.empty"));
         }
         try {
-            final Azure azure = AuthMethodManager.getInstance().getAzureManager().getAzure(subscriptionId);
-            if (azure.resourceGroups().getByName(resourceGroup) != null) {
+            final ResourceGroup rg = Azure.az(AzureGroup.class).get(subscriptionId, resourceGroup);
+            if (rg != null) {
                 cacheAndThrow(resourceGroupValidationCache, subscriptionId, message("appService.resourceGroup.validate.exist"));
             }
-        } catch (RestException e) {
-            throw new IllegalArgumentException(e.getMessage());
+        } catch (ManagementException e) {
+            // swallow exception for get resources
         }
         resourceGroupValidationCache.put(subscriptionId, null);
     }
@@ -146,6 +135,17 @@ public class ValidationUtils {
             throw new IllegalArgumentException(message("function.applicationInsights.validate.invalidChar", String.join(",", invalidCharacters)));
         }
     }
+
+    public static void validateSpringCloudAppName(final String name, final SpringCloudCluster cluster) {
+        if (StringUtils.isEmpty(name)) {
+            throw new IllegalArgumentException(message("springCloud.app.name.validate.empty"));
+        } else if (!name.matches(SPRING_CLOUD_APP_NAME_PATTERN)) {
+            throw new IllegalArgumentException(message("springCloud.app.name.validate.invalid"));
+        } else if (Objects.nonNull(cluster) && cluster.app(name).exists()) {
+            throw new IllegalArgumentException(message("springCloud.app.name.validate.exist", name));
+        }
+    }
+
 
     private static void cacheAndThrow(Map exceptionCache, Object key, String errorMessage) {
         exceptionCache.put(key, errorMessage);

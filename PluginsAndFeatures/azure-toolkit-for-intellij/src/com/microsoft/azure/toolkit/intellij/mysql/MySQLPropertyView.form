@@ -21,7 +21,7 @@
             <properties/>
             <border type="none"/>
             <children>
-              <nested-form id="fb60e" form-file="com/microsoft/azure/toolkit/intellij/mysql/MySQLPropertyActionPanel.form" binding="propertyActionPanel">
+              <nested-form id="fb60e" form-file="com/microsoft/azure/toolkit/intellij/database/ui/MySQLPropertyActionPanel.form" binding="propertyActionPanel">
                 <constraints>
                   <grid row="0" column="0" row-span="1" col-span="3" vsize-policy="3" hsize-policy="3" anchor="0" fill="1" indent="0" use-parent-layout="false"/>
                 </constraints>
@@ -47,7 +47,7 @@
                   <text value="Connection security"/>
                 </properties>
               </component>
-              <nested-form id="57155" form-file="com/microsoft/azure/toolkit/intellij/mysql/ConnectionSecurityPanel.form" binding="connectionSecurity">
+              <nested-form id="57155" form-file="com/microsoft/azure/toolkit/intellij/database/ui/ConnectionSecurityPanel.form" binding="connectionSecurity">
                 <constraints>
                   <grid row="4" column="0" row-span="1" col-span="3" vsize-policy="3" hsize-policy="3" anchor="0" fill="1" indent="1" use-parent-layout="false"/>
                 </constraints>
@@ -60,12 +60,12 @@
                   <text value="Connection strings"/>
                 </properties>
               </component>
-              <nested-form id="4949c" form-file="com/microsoft/azure/toolkit/intellij/mysql/ConnectionStringsOutputPanel.form" binding="connectionStringsJDBC">
+              <nested-form id="4949c" form-file="com/microsoft/azure/toolkit/intellij/database/ui/ConnectionStringsOutputPanel.form" binding="connectionStringsJDBC">
                 <constraints>
                   <grid row="7" column="0" row-span="1" col-span="3" vsize-policy="3" hsize-policy="3" anchor="0" fill="1" indent="1" use-parent-layout="false"/>
                 </constraints>
               </nested-form>
-              <nested-form id="c0720" form-file="com/microsoft/azure/toolkit/intellij/mysql/ConnectionStringsOutputPanel.form" binding="connectionStringsSpring">
+              <nested-form id="c0720" form-file="com/microsoft/azure/toolkit/intellij/database/ui/ConnectionStringsOutputPanel.form" binding="connectionStringsSpring">
                 <constraints>
                   <grid row="8" column="0" row-span="1" col-span="3" vsize-policy="3" hsize-policy="3" anchor="0" fill="1" indent="1" use-parent-layout="false"/>
                 </constraints>
@@ -80,7 +80,7 @@
                   <grid row="6" column="0" row-span="1" col-span="1" vsize-policy="0" hsize-policy="0" anchor="8" fill="0" indent="1" use-parent-layout="false"/>
                 </constraints>
                 <properties>
-                  <text value="Choose a database for your conneciton strings:"/>
+                  <text value="Choose a database for your connection strings:"/>
                 </properties>
               </component>
               <hspacer id="4b8df">

@@ -1,23 +1,6 @@
 /*
- * Copyright (c) Microsoft Corporation
- *
- * All rights reserved.
- *
- * MIT License
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
- * documentation files (the "Software"), to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and
- * to permit persons to whom the Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all copies or substantial portions of
- * the Software.
- *
- * THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
- * THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Licensed under the MIT License. See License.txt in the project root for license information.
  */
 
 package com.microsoft.azure.toolkit.intellij.redis;
@@ -31,26 +14,26 @@ import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.DialogWrapper;
 import com.intellij.openapi.ui.ValidationInfo;
-import com.intellij.ui.ListCellRendererWrapper;
 import com.microsoft.azure.management.Azure;
 import com.microsoft.azure.management.redis.RedisCache;
-import com.microsoft.azure.management.resources.Location;
-import com.microsoft.azure.management.resources.ResourceGroup;
+import com.microsoft.azure.toolkit.intellij.appservice.region.RegionComboBox;
+import com.microsoft.azure.toolkit.intellij.appservice.subscription.SubscriptionComboBox;
+import com.microsoft.azure.toolkit.lib.common.model.Region;
+import com.microsoft.azure.toolkit.lib.common.model.ResourceGroup;
+import com.microsoft.azure.toolkit.lib.common.model.Subscription;
 import com.microsoft.azure.toolkit.lib.common.task.AzureTask;
 import com.microsoft.azure.toolkit.lib.common.task.AzureTaskManager;
-import com.microsoft.azuretools.authmanage.models.SubscriptionDetail;
 import com.microsoft.azuretools.azurecommons.helpers.RedisCacheUtil;
 import com.microsoft.azuretools.azurecommons.rediscacheprocessors.ProcessingStrategy;
 import com.microsoft.azuretools.azurecommons.rediscacheprocessors.ProcessorBase;
 import com.microsoft.azuretools.azurecommons.util.Utils;
+import com.microsoft.azuretools.core.mvp.model.AzureMvpModel;
+import com.microsoft.azuretools.core.mvp.model.ResourceEx;
 import com.microsoft.azuretools.sdkmanage.AzureManager;
 import com.microsoft.azuretools.telemetrywrapper.ErrorType;
 import com.microsoft.azuretools.telemetrywrapper.EventUtil;
 import com.microsoft.azuretools.telemetrywrapper.Operation;
 import com.microsoft.azuretools.telemetrywrapper.TelemetryManager;
-import com.microsoft.azuretools.utils.AzureModel;
-import com.microsoft.azuretools.utils.AzureModelController;
-import com.microsoft.intellij.AzurePlugin;
 import com.microsoft.intellij.helpers.LinkListener;
 import com.microsoft.intellij.ui.components.AzureDialogWrapper;
 import com.microsoft.intellij.util.PluginUtil;
@@ -60,7 +43,15 @@ import com.microsoft.tooling.msservices.serviceexplorer.Node;
 import com.microsoft.tooling.msservices.serviceexplorer.azure.rediscache.RedisCacheModule;
 import org.jetbrains.annotations.Nullable;
 
-import javax.swing.*;
+import javax.swing.ButtonGroup;
+import javax.swing.DefaultComboBoxModel;
+import javax.swing.JCheckBox;
+import javax.swing.JComboBox;
+import javax.swing.JComponent;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.JRadioButton;
+import javax.swing.JTextField;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import java.awt.event.ActionEvent;
@@ -69,7 +60,6 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -90,26 +80,25 @@ public class CreateRedisCacheForm extends AzureDialogWrapper {
     // Widgets
     private JPanel pnlContent;
     private JTextField txtRedisName;
-    private JComboBox<SubscriptionDetail> cbSubs;
+    private com.microsoft.azure.toolkit.intellij.appservice.subscription.SubscriptionComboBox cbSubs;
     private JRadioButton rdoCreateNewGrp;
     private JTextField txtNewResGrp;
     private JRadioButton rdoUseExist;
     private JComboBox<String> cbUseExist;
     // TODO(qianjin) : use AzureComboBox
-    private JComboBox<Location> cbLocations;
+    private com.microsoft.azure.toolkit.intellij.appservice.region.RegionComboBox cbLocations;
     private JComboBox<String> cbPricing;
     private JCheckBox chkNoSSL;
     private JLabel lblPricing;
 
     // Util Variables
     private AzureManager azureManager;
-    private List<SubscriptionDetail> allSubs;
     private LinkedHashMap<String, String> skus;
     private List<String> sortedGroups;
     private Runnable onCreate;
 
     // Form Variables
-    private SubscriptionDetail currentSub = null;
+    private Subscription currentSub = null;
     private boolean noSSLPort = false;
     private boolean newResGrp = true;
     private String redisCacheNameValue = null;
@@ -163,7 +152,7 @@ public class CreateRedisCacheForm extends AzureDialogWrapper {
     protected ValidationInfo doValidate() {
         redisCacheNameValue = txtRedisName.getText();
         selectedResGrpValue = newResGrp ? txtNewResGrp.getText() : cbUseExist.getSelectedItem().toString();
-        selectedLocationValue = ((Location) cbLocations.getSelectedItem()).inner().name();
+        selectedLocationValue = ((Region) cbLocations.getSelectedItem()).getName();
         selectedPriceTierValue = cbPricing.getSelectedItem().toString();
 
         if (redisCacheNameValue.length() > REDIS_CACHE_MAX_NAME_LENGTH || !redisCacheNameValue.matches(DNS_NAME_REGEX)) {
@@ -180,7 +169,7 @@ public class CreateRedisCacheForm extends AzureDialogWrapper {
                 return new ValidationInfo(RES_GRP_NAME_RULE, txtNewResGrp);
             }
         }
-        for (final RedisCache existingRedisCache : azureManager.getAzure(currentSub.getSubscriptionId()).redisCaches().list()) {
+        for (final RedisCache existingRedisCache : azureManager.getAzure(currentSub.getId()).redisCaches().list()) {
             if (existingRedisCache.name().equals(redisCacheNameValue)) {
                 return new ValidationInfo(String.format(VALIDATION_FORMAT, redisCacheNameValue), txtRedisName);
             }
@@ -227,7 +216,7 @@ public class CreateRedisCacheForm extends AzureDialogWrapper {
         final Operation operation = TelemetryManager.createOperation(REDIS, CREATE_REDIS);
         try {
             operation.start();
-            Azure azure = azureManager.getAzure(currentSub.getSubscriptionId());
+            Azure azure = azureManager.getAzure(currentSub.getId());
             setSubscription(currentSub);
             ProcessingStrategy processor = RedisCacheUtil.doGetProcessor(
                     azure, skus, redisCacheNameValue, selectedLocationValue, selectedResGrpValue,
@@ -282,21 +271,6 @@ public class CreateRedisCacheForm extends AzureDialogWrapper {
         setOKActionEnabled(false);
 
         azureManager = getInstance().getAzureManager();
-        allSubs = azureManager.getSubscriptionManager().getSubscriptionDetails();
-        List<SubscriptionDetail> selectedSubscriptions = allSubs.stream().filter(SubscriptionDetail::isSelected).collect(Collectors.toList());
-        cbSubs.setModel(new DefaultComboBoxModel<>(selectedSubscriptions.toArray(new SubscriptionDetail[selectedSubscriptions.size()])));
-        if (selectedSubscriptions.size() > 0) {
-            currentSub = (SubscriptionDetail) cbSubs.getSelectedItem();
-            AzureTaskManager.getInstance().runInModal(new AzureTask(project, "Loading Available Locations...", false, () -> {
-                try {
-                    AzureModelController.updateSubscriptionMaps(null);
-                    fillLocationsAndResourceGrps(currentSub);
-                } catch (Exception ex) {
-                    AzurePlugin.log("Error loading locations", ex);
-                }
-            }));
-        }
-
         skus = RedisCacheUtil.initSkus();
         cbPricing.setModel(new DefaultComboBoxModel(skus.keySet().toArray()));
     }
@@ -322,8 +296,9 @@ public class CreateRedisCacheForm extends AzureDialogWrapper {
         cbSubs.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                currentSub = (SubscriptionDetail) cbSubs.getSelectedItem();
-                fillLocationsAndResourceGrps(currentSub);
+                currentSub = (Subscription) cbSubs.getSelectedItem();
+                cbLocations.setSubscription(currentSub);
+                fillResourceGrps(currentSub);
                 validateEmptyFields();
             }
         });
@@ -398,27 +373,18 @@ public class CreateRedisCacheForm extends AzureDialogWrapper {
                 }
             }
         });
-
-        cbLocations.setRenderer(new ListCellRendererWrapper<Object>() {
-            @Override
-            public void customize(JList list, Object o, int i, boolean b, boolean b1) {
-                if (o != null && (o instanceof Location)) {
-                    setText("  " + ((Location) o).displayName());
-                }
-            }
-        });
     }
 
-    private void fillLocationsAndResourceGrps(SubscriptionDetail selectedSub) {
-        List<Location> locations = AzureModel.getInstance().getSubscriptionToLocationMap().get(selectedSub);
-        if (locations != null) {
-            List<Location> sortedLocations = locations.stream().filter(e -> SUPPORTED_REGIONS.contains(e.name()))
-                    .sorted(Comparator.comparing(Location::displayName)).collect(Collectors.toList());
-            cbLocations.setModel(new DefaultComboBoxModel(sortedLocations.toArray()));
-        }
-        List<ResourceGroup> groups = AzureModel.getInstance().getSubscriptionToResourceGroupMap().get(selectedSub);
+    private void createUIComponents() {
+        this.cbSubs = new SubscriptionComboBox();
+        this.cbLocations = new RegionComboBox();
+    }
+
+    private void fillResourceGrps(Subscription selectedSub) {
+        List<ResourceGroup> groups = AzureMvpModel.getInstance().getResourceGroups(selectedSub.getId()).stream()
+                .map(ResourceEx::getResource).collect(Collectors.toList());
         if (groups != null) {
-            sortedGroups = groups.stream().map(ResourceGroup::name).sorted().collect(Collectors.toList());
+            sortedGroups = groups.stream().map(ResourceGroup::getName).sorted().collect(Collectors.toList());
             cbUseExist.setModel(new DefaultComboBoxModel<>(sortedGroups.toArray(new String[sortedGroups.size()])));
         }
     }

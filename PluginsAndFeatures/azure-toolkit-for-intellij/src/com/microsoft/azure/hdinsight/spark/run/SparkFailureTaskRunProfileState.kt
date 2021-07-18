@@ -26,6 +26,7 @@ import com.intellij.execution.DefaultExecutionResult
 import com.intellij.execution.ExecutionException
 import com.intellij.execution.ExecutionResult
 import com.intellij.execution.Executor
+import com.intellij.execution.ShortenCommandLine.MANIFEST
 import com.intellij.execution.configurations.GeneralCommandLine
 import com.intellij.execution.configurations.JavaParameters
 import com.intellij.execution.process.KillableColoredProcessHandler
@@ -33,7 +34,7 @@ import com.intellij.execution.process.ProcessAdapter
 import com.intellij.execution.process.ProcessEvent
 import com.intellij.execution.runners.ProgramRunner
 import com.intellij.execution.util.JavaParametersUtil
-import com.intellij.util.PathUtil
+import com.intellij.openapi.util.io.FileUtil
 import com.microsoft.azure.hdinsight.spark.common.SparkFailureTaskDebugConfigurableModel
 import com.microsoft.azure.hdinsight.spark.ui.SparkJobLogConsoleView
 import com.microsoft.azuretools.telemetrywrapper.ErrorType
@@ -118,18 +119,18 @@ open class SparkFailureTaskRunProfileState(val name: String,
 
         JavaParametersUtil.configureConfiguration(params, settingsConfigModel)
 
+        // Put failure context runtime at beginning, after JDK6, the classpath support <dir>/*
+        params.classPath.addAllFiles(File(FileUtil.toCanonicalPath(settingsConfigModel.workingDirectory), "runtime").listFiles())
+
         // The dependent spark-tools.jar is already in the Maven project lib/ directory
         JavaParametersUtil.configureProject(project, params, JavaParameters.JDK_AND_CLASSES_AND_TESTS, null)
 
         // Additional VM parameters
         additionalVmParameters.forEach { params.vmParametersList.add(it) }
 
-        // Put failure context runtime at beginning, after JDK6, the classpath support <dir>/*
-        params.classPath.addFirst("${PathUtil.getCanonicalPath(settingsConfigModel.workingDirectory)}/runtime/*")
-
         // Prepare log4j.properties file
         settingsConfigModel.log4jProperties?.also { log4jProp ->
-            val log4jPropertiesFile = File("${PathUtil.getCanonicalPath(settingsConfigModel.workingDirectory)}/conf/log4j.properties")
+            val log4jPropertiesFile = File("${FileUtil.toCanonicalPath(settingsConfigModel.workingDirectory)}/conf/log4j.properties")
                     .apply {
                         parentFile.mkdir()
                         writeText(log4jProp)
@@ -140,6 +141,7 @@ open class SparkFailureTaskRunProfileState(val name: String,
 
         // Helper Main class
         params.mainClass = settingsConfigModel.runClass
+        params.setShortenCommandLine(MANIFEST, null)
 
         return params.toCommandLine()
     }

@@ -1,31 +1,14 @@
 /*
- * Copyright (c) Microsoft Corporation
- *
- * All rights reserved.
- *
- * MIT License
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
- * documentation files (the "Software"), to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and
- * to permit persons to whom the Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all copies or substantial portions of
- * the Software.
- *
- * THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
- * THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Licensed under the MIT License. See License.txt in the project root for license information.
  */
 
 package com.microsoft.azure.toolkit.intellij.function.runner;
 
-import com.microsoft.azure.common.project.IProject;
 import com.microsoft.azure.management.Azure;
-import com.microsoft.azuretools.authmanage.AuthMethodManager;
 import com.microsoft.azure.toolkit.intellij.function.runner.library.IFunctionContext;
+import com.microsoft.azure.toolkit.lib.common.IProject;
+import com.microsoft.azuretools.authmanage.AuthMethodManager;
 import lombok.Data;
 
 import java.util.HashMap;
@@ -54,7 +37,11 @@ public class IntelliJFunctionContext implements IFunctionContext {
 
     private String deployment;
 
+    // todo: remove app settings and related codes
+    @Deprecated
     private Map<String, String> appSettings = new HashMap<>();
+
+    private String appSettingsKey;
 
     private String moduleName;
 
@@ -94,21 +81,16 @@ public class IntelliJFunctionContext implements IFunctionContext {
         return null;
     }
 
-    public Map<String, String> getTelemetryProperties(Map<String, String> properties) {
-        HashMap result = new HashMap();
-
+    public Map<String, String> getTelemetryProperties() {
+        final HashMap result = new HashMap();
         try {
-            if (properties != null) {
-                result.putAll(properties);
-            }
-            result.put("runtime", this.getRuntime().getOs());
+            result.put("runtime", this.getOs());
             result.put("subscriptionId", this.getSubscription());
-            result.put("pricingTier", this.getPricingTier());
             result.put("region", this.getRegion());
+            result.put("functionJavaVersion", this.getJavaVersion());
         } catch (Exception e) {
             // swallow exception as telemetry should not break users operation
         }
-
         return result;
     }
 }

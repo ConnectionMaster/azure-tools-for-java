@@ -1,23 +1,6 @@
 /*
- * Copyright (c) Microsoft Corporation
- *
- * All rights reserved.
- *
- * MIT License
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
- * documentation files (the "Software"), to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and
- * to permit persons to whom the Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all copies or substantial portions of
- * the Software.
- *
- * THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
- * THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Licensed under the MIT License. See License.txt in the project root for license information.
  */
 
 package com.microsoft.azure.toolkit.intellij.function.runner.core;
@@ -35,23 +18,26 @@ import com.intellij.openapi.roots.OrderEnumerator;
 import com.intellij.openapi.roots.OrderRootType;
 import com.intellij.openapi.roots.libraries.Library;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.intellij.psi.*;
+import com.intellij.psi.JavaPsiFacade;
+import com.intellij.psi.PsiAnnotation;
+import com.intellij.psi.PsiClass;
+import com.intellij.psi.PsiJavaCodeReferenceElement;
+import com.intellij.psi.PsiMethod;
+import com.intellij.psi.PsiModifierListOwner;
 import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.psi.search.searches.AnnotatedElementsSearch;
 import com.intellij.util.containers.ContainerUtil;
-import com.microsoft.azure.common.exceptions.AzureExecutionException;
-import com.microsoft.azure.common.function.bindings.Binding;
-import com.microsoft.azure.common.function.bindings.BindingEnum;
-import com.microsoft.azure.common.function.configurations.FunctionConfiguration;
 import com.microsoft.azure.functions.annotation.StorageAccount;
-import com.microsoft.azure.management.appservice.FunctionApp;
-import com.microsoft.azure.management.appservice.OperatingSystem;
+import com.microsoft.azure.toolkit.lib.common.exception.AzureExecutionException;
 import com.microsoft.azure.toolkit.lib.common.exception.AzureToolkitRuntimeException;
+import com.microsoft.azure.toolkit.lib.common.logging.Log;
 import com.microsoft.azure.toolkit.lib.common.operation.AzureOperation;
+import com.microsoft.azure.toolkit.lib.legacy.function.bindings.Binding;
+import com.microsoft.azure.toolkit.lib.legacy.function.bindings.BindingEnum;
+import com.microsoft.azure.toolkit.lib.legacy.function.configurations.FunctionConfiguration;
 import com.microsoft.azuretools.azurecommons.helpers.Nullable;
 import com.microsoft.azuretools.utils.JsonUtils;
-import com.microsoft.azuretools.utils.WebAppUtils;
-import com.sun.tools.sjavac.Log;
+import com.microsoft.intellij.secure.IdeaSecureStore;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.ArrayUtils;
@@ -66,7 +52,13 @@ import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import static com.microsoft.intellij.ui.messages.AzureBundle.message;
 
@@ -83,7 +75,7 @@ public class FunctionUtils {
     private static final String AZURE_FUNCTIONS = "azure-functions";
     private static final String AZURE_FUNCTION_CUSTOM_BINDING_CLASS =
             "com.microsoft.azure.functions.annotation.CustomBinding";
-    private static Map<BindingEnum, List<String>> REQUIRED_ATTRIBUTE_MAP = new HashMap<>();
+    private static final Map<BindingEnum, List<String>> REQUIRED_ATTRIBUTE_MAP = new HashMap<>();
     private static final List<String> CUSTOM_BINDING_RESERVED_PROPERTIES = Arrays.asList("type", "name", "direction");
 
     static {
@@ -92,13 +84,20 @@ public class FunctionUtils {
         REQUIRED_ATTRIBUTE_MAP.put(BindingEnum.HttpTrigger, Arrays.asList("authLevel"));
     }
 
-    public static String getFunctionJavaVersion(FunctionApp functionApp) {
-        if (!WebAppUtils.isJavaWebApp(functionApp)) {
-            return null;
+    public static void saveAppSettingsToSecurityStorage(String key, Map<String, String> appSettings) {
+        if (StringUtils.isEmpty(key)) {
+            return;
         }
-        return functionApp.operatingSystem() == OperatingSystem.WINDOWS ?
-               functionApp.javaVersion().toString() :
-               functionApp.linuxFxVersion().split("|")[1];
+        final String appSettingsJsonValue = JsonUtils.toJsonString(appSettings);
+        IdeaSecureStore.getInstance().savePassword(key, appSettingsJsonValue);
+    }
+
+    public static Map<String, String> loadAppSettingsFromSecurityStorage(String key) {
+        if (StringUtils.isEmpty(key)) {
+            return new HashMap<>();
+        }
+        final String value = IdeaSecureStore.getInstance().loadPassword(key);
+        return StringUtils.isEmpty(value) ? new HashMap<>() : JsonUtils.fromJson(value, Map.class);
     }
 
     public static File getTempStagingFolder() {
@@ -107,21 +106,31 @@ public class FunctionUtils {
             final File file = path.toFile();
             FileUtils.forceDeleteOnExit(file);
             return file;
-        } catch (IOException e) {
+        } catch (final IOException e) {
             throw new AzureToolkitRuntimeException("failed to get temp staging folder", e);
         }
     }
 
+    @AzureOperation(
+        name = "function.clean_staging_folder",
+        params = {"stagingFolder.getName()"},
+        type = AzureOperation.Type.TASK
+    )
     public static void cleanUpStagingFolder(File stagingFolder) {
         try {
             if (stagingFolder != null) {
                 FileUtils.deleteDirectory(stagingFolder);
             }
-        } catch (IOException e) {
+        } catch (final IOException e) {
             // swallow exceptions while clean up
         }
     }
 
+    @AzureOperation(
+        name = "function.list_function_modules",
+        params = {"project.getName()"},
+        type = AzureOperation.Type.TASK
+    )
     public static Module[] listFunctionModules(Project project) {
         final Module[] modules = ModuleManager.getInstance(project).getModules();
         return Arrays.stream(modules).filter(m -> {
@@ -143,8 +152,8 @@ public class FunctionUtils {
     }
 
     @AzureOperation(
-        value = "check if project[%s] is a valid function project",
-        params = {"$project.getName()"},
+        name = "function.validate_project",
+        params = {"project.getName()"},
         type = AzureOperation.Type.TASK
     )
     public static boolean isFunctionProject(Project project) {
@@ -162,8 +171,8 @@ public class FunctionUtils {
     }
 
     @AzureOperation(
-        value = "find function methods from module[%s] by annotation",
-        params = {"$model.getName"},
+        name = "function.list_function_methods",
+        params = {"module.getName()"},
         type = AzureOperation.Type.TASK
     )
     public static PsiMethod[] findFunctionsByAnnotation(Module module) {
@@ -177,7 +186,7 @@ public class FunctionUtils {
         return methods.toArray(new PsiMethod[0]);
     }
 
-    public static final Path getDefaultHostJson(Project project) {
+    public static Path getDefaultHostJson(Project project) {
         return new File(project.getBasePath(), "host.json").toPath();
     }
 
@@ -191,14 +200,14 @@ public class FunctionUtils {
             final File result = File.createTempFile("host", ".json");
             FileUtils.write(result, DEFAULT_HOST_JSON, Charset.defaultCharset());
             return result.toPath();
-        } catch (IOException e) {
+        } catch (final IOException e) {
             return null;
         }
     }
 
     @AzureOperation(
-        value = "copy local settings[%s] to staging folder[%s]",
-        params = {"$model.getName"},
+        name = "function.copy_settings",
+        params = {"localSettingJson", "stagingFolder"},
         type = AzureOperation.Type.TASK
     )
     public static void copyLocalSettingsToStagingFolder(Path stagingFolder,
@@ -212,7 +221,7 @@ public class FunctionUtils {
     }
 
     @AzureOperation(
-        value = "prepare staging folder for function method",
+        name = "function.prepare_staging_folder",
         type = AzureOperation.Type.TASK
     )
     public static Map<String, FunctionConfiguration> prepareStagingFolder(Path stagingFolder, Path hostJson, Module module, PsiMethod[] methods)
@@ -275,6 +284,14 @@ public class FunctionUtils {
         return FunctionCliResolver.resolveFunc();
     }
 
+    public static List<String> getFunctionBindingList(Map<String, FunctionConfiguration> configMap) {
+        return configMap.values().stream().flatMap(configuration -> configuration.getBindings().stream())
+                        .map(Binding::getType)
+                        .sorted()
+                        .distinct()
+                        .collect(Collectors.toList());
+    }
+
     private static void writeFunctionJsonFile(File file, FunctionConfiguration config) throws IOException {
         final Map<String, Object> json = new LinkedHashMap<>();
         json.put("scriptFile", config.getScriptFile());
@@ -314,7 +331,7 @@ public class FunctionUtils {
         for (final PsiMethod method : methods) {
             final PsiAnnotation annotation = AnnotationUtil.findAnnotation(method,
                                                                            FunctionUtils.AZURE_FUNCTION_ANNOTATION_CLASS);
-            String functionName = AnnotationUtil.getDeclaredStringAttributeValue(annotation, "value");
+            final String functionName = AnnotationUtil.getDeclaredStringAttributeValue(annotation, "value");
             configMap.put(functionName, generateConfiguration(method));
         }
         return configMap;
@@ -376,11 +393,11 @@ public class FunctionUtils {
     }
 
     private static Binding getUserDefinedBinding(final Project project, PsiAnnotation annotation) throws AzureExecutionException {
-        PsiJavaCodeReferenceElement referenceElement = annotation.getNameReferenceElement();
+        final PsiJavaCodeReferenceElement referenceElement = annotation.getNameReferenceElement();
         if (referenceElement == null) {
             return null;
         }
-        PsiAnnotation customBindingAnnotation =
+        final PsiAnnotation customBindingAnnotation =
                 AnnotationUtil.findAnnotation((PsiModifierListOwner) referenceElement.resolve(),
                                               AZURE_FUNCTION_CUSTOM_BINDING_CLASS);
         if (customBindingAnnotation == null) {
@@ -393,9 +410,9 @@ public class FunctionUtils {
                                                                                                           customBindingAnnotation,
                                                                                                           null);
 
-        Map<String, Object> mergedMap = new HashMap<>(annotationProperties);
+        final Map<String, Object> mergedMap = new HashMap<>(annotationProperties);
         customBindingProperties.forEach(mergedMap::putIfAbsent);
-        Binding extendBinding = new Binding(BindingEnum.CustomBinding) {
+        final Binding extendBinding = new Binding(BindingEnum.CustomBinding) {
 
             public String getName() {
                 return (String) mergedMap.get("name");
@@ -488,7 +505,7 @@ public class FunctionUtils {
         if (module == null) {
             return false;
         }
-        CompilerModuleExtension cme = CompilerModuleExtension.getInstance(module);
+        final CompilerModuleExtension cme = CompilerModuleExtension.getInstance(module);
         if (cme == null) {
             return false;
         }

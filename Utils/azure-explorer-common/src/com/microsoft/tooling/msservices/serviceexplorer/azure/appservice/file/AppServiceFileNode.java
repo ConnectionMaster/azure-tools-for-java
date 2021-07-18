@@ -1,55 +1,47 @@
 /*
- * Copyright (c) Microsoft Corporation
- *
- * All rights reserved.
- *
- * MIT License
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
- * documentation files (the "Software"), to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and
- * to permit persons to whom the Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all copies or substantial portions of
- * the Software.
- *
- * THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
- * THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Licensed under the MIT License. See License.txt in the project root for license information.
  */
 
 package com.microsoft.tooling.msservices.serviceexplorer.azure.appservice.file;
 
-import com.microsoft.azure.toolkit.lib.appservice.file.AppServiceFile;
-import com.microsoft.azure.toolkit.lib.appservice.file.AppServiceFileService;
+import com.microsoft.azure.toolkit.lib.appservice.model.AppServiceFile;
+import com.microsoft.azure.toolkit.lib.appservice.service.IAppService;
+import com.microsoft.azure.toolkit.lib.appservice.service.IFunctionAppBase;
+import com.microsoft.azure.toolkit.lib.appservice.utils.Utils;
 import com.microsoft.azure.toolkit.lib.common.operation.AzureOperation;
+import com.microsoft.azure.toolkit.lib.common.operation.AzureOperationBundle;
+import com.microsoft.azure.toolkit.lib.common.operation.IAzureOperationTitle;
 import com.microsoft.azure.toolkit.lib.common.task.AzureTask;
 import com.microsoft.azure.toolkit.lib.common.task.AzureTaskManager;
+import com.microsoft.azuretools.telemetry.AppInsightsConstants;
+import com.microsoft.azuretools.telemetry.TelemetryConstants;
+import com.microsoft.azuretools.telemetry.TelemetryProperties;
+import com.microsoft.azuretools.telemetrywrapper.EventUtil;
 import com.microsoft.tooling.msservices.components.DefaultLoader;
 import com.microsoft.tooling.msservices.serviceexplorer.AzureRefreshableNode;
 import com.microsoft.tooling.msservices.serviceexplorer.Node;
 import com.microsoft.tooling.msservices.serviceexplorer.NodeActionEvent;
 import com.microsoft.tooling.msservices.serviceexplorer.NodeActionListener;
 import com.microsoft.tooling.msservices.serviceexplorer.Sortable;
-import com.microsoft.tooling.msservices.serviceexplorer.azure.webapp.WebAppModule;
 import lombok.extern.java.Log;
 import org.apache.commons.io.FileUtils;
 
 import javax.swing.*;
+import java.util.Collections;
+import java.util.Map;
 
 @Log
-public class AppServiceFileNode extends AzureRefreshableNode {
-    private static final String MODULE_ID = WebAppModule.class.getName();
+public class AppServiceFileNode extends AzureRefreshableNode implements TelemetryProperties {
     private static final long SIZE_20MB = 20 * 1024 * 1024;
-    private final AppServiceFileService fileService;
-    private final AppServiceFile file;
 
-    public AppServiceFileNode(final AppServiceFile file, final Node parent, AppServiceFileService service) {
+    private final AppServiceFile file;
+    private final IAppService appService;
+
+    public AppServiceFileNode(final AppServiceFile file, final Node parent, IAppService webApp) {
         super(file.getName(), file.getName(), parent, null);
         this.file = file;
-        this.fileService = service;
+        this.appService = webApp;
         if (this.file.getType() != AppServiceFile.Type.DIRECTORY) {
             this.addDownloadAction();
         }
@@ -64,25 +56,27 @@ public class AppServiceFileNode extends AzureRefreshableNode {
         });
     }
 
-    @AzureOperation(value = "download file", type = AzureOperation.Type.ACTION)
+    @AzureOperation(name = "appservice|file.download", params = {"this.file.getName()"}, type = AzureOperation.Type.ACTION)
     private void download() {
         DefaultLoader.getIdeHelper().saveAppServiceFile(file, getProject(), null);
     }
 
     @Override
-    @AzureOperation(value = "refresh file", type = AzureOperation.Type.ACTION)
+    @AzureOperation(name = "appservice|file.refresh", params = {"this.file.getName()"}, type = AzureOperation.Type.ACTION)
     protected void refreshItems() {
-        if (this.file.getType() != AppServiceFile.Type.DIRECTORY) {
-            return;
-        }
-        this.fileService.getFilesInDirectory(this.file.getPath()).stream()
-                        .map(file -> new AppServiceFileNode(file, this, fileService))
-                        .forEach(this::addChildNode);
+        executeWithTelemetryWrapper(TelemetryConstants.REFRESH_FILE, () -> {
+            if (this.file.getType() != AppServiceFile.Type.DIRECTORY) {
+                return;
+            }
+            appService.getFilesInDirectory(this.file.getPath()).stream()
+                    .map(file -> new AppServiceFileNode(file, this, appService))
+                    .forEach(this::addChildNode);
+        });
     }
 
-    @AzureOperation(value = "open file in editor", type = AzureOperation.Type.ACTION)
+    @AzureOperation(name = "appservice|file.open", params = {"this.file.getName()"}, type = AzureOperation.Type.ACTION)
     private void open(final Object context) {
-        DefaultLoader.getIdeHelper().openAppServiceFile(this.file, context);
+        executeWithTelemetryWrapper(TelemetryConstants.OPEN_FILE, () -> DefaultLoader.getIdeHelper().openAppServiceFile(this.file, context));
     }
 
     @Override
@@ -94,8 +88,8 @@ public class AppServiceFileNode extends AzureRefreshableNode {
             return;
         }
         final Runnable runnable = () -> open(context);
-        final String message = String.format("fetching file (%s)...", this.file.getName());
-        AzureTaskManager.getInstance().runInBackground(new AzureTask(this.getProject(), message, false, runnable));
+        final IAzureOperationTitle title = AzureOperationBundle.title("appservice|file.get_content", file.getName(), file.getApp().name());
+        AzureTaskManager.getInstance().runInBackground(new AzureTask(this.getProject(), title, false, runnable));
     }
 
     @Override
@@ -113,5 +107,23 @@ public class AppServiceFileNode extends AzureRefreshableNode {
         return file.getType() == AppServiceFile.Type.DIRECTORY ?
                String.format("Type: %s Date modified: %s", file.getMime(), file.getMtime()) :
                String.format("Type: %s Size: %s Date modified: %s", file.getMime(), FileUtils.byteCountToDisplaySize(file.getSize()), file.getMtime());
+    }
+
+    @Override
+    public String getServiceName() {
+        return file.getApp() instanceof IFunctionAppBase ? TelemetryConstants.FUNCTION : TelemetryConstants.WEBAPP;
+    }
+
+    @Override
+    public Map<String, String> toProperties() {
+        return Collections.singletonMap(AppInsightsConstants.SubscriptionId, Utils.getSubscriptionId(file.getApp().id()));
+    }
+
+    // todo: replace with AzureOperation when custom properties is supported for AzureOperation
+    private void executeWithTelemetryWrapper(final String operationName, Runnable runnable) {
+        EventUtil.executeWithLog(getServiceName(), operationName, operation -> {
+            operation.trackProperty(TelemetryConstants.SUBSCRIPTIONID, Utils.getSubscriptionId(file.getApp().id()));
+            runnable.run();
+        });
     }
 }

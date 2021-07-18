@@ -1,23 +1,6 @@
 /*
- * Copyright (c) Microsoft Corporation
- *
- * All rights reserved.
- *
- * MIT License
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
- * documentation files (the "Software"), to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and
- * to permit persons to whom the Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all copies or substantial portions of
- * the Software.
- *
- * THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
- * THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Licensed under the MIT License. See License.txt in the project root for license information.
  */
 
 package com.microsoft.azure.toolkit.intellij.arm;
@@ -31,13 +14,15 @@ import com.intellij.openapi.wm.WindowManager;
 import com.intellij.ui.HyperlinkLabel;
 import com.microsoft.azure.management.resources.Deployment;
 import com.microsoft.azure.management.resources.DeploymentMode;
-import com.microsoft.azure.management.resources.Subscription;
+import com.microsoft.azure.toolkit.lib.auth.AzureAccount;
+import com.microsoft.azure.toolkit.lib.common.model.Subscription;
+import com.microsoft.azure.toolkit.lib.common.operation.AzureOperationBundle;
+import com.microsoft.azure.toolkit.lib.common.operation.IAzureOperationTitle;
 import com.microsoft.azure.toolkit.lib.common.task.AzureTask;
 import com.microsoft.azure.toolkit.lib.common.task.AzureTaskManager;
 import com.microsoft.azuretools.telemetry.TelemetryConstants;
 import com.microsoft.azuretools.telemetrywrapper.EventType;
 import com.microsoft.azuretools.telemetrywrapper.EventUtil;
-import com.microsoft.azuretools.utils.AzureModel;
 import com.microsoft.intellij.ui.util.UIUtils;
 import com.microsoft.tooling.msservices.serviceexplorer.azure.arm.deployments.DeploymentNode;
 import org.apache.commons.io.IOUtils;
@@ -46,8 +31,11 @@ import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
 import java.io.FileReader;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
+import static com.microsoft.azure.toolkit.lib.Azure.az;
 import static com.microsoft.azuretools.telemetry.TelemetryConstants.BROWSE_TEMPLATE_SAMPLES;
 import static com.microsoft.azure.toolkit.intellij.arm.action.UpdateDeploymentAction.NOTIFY_UPDATE_DEPLOYMENT_FAIL;
 import static com.microsoft.azure.toolkit.intellij.arm.action.UpdateDeploymentAction.NOTIFY_UPDATE_DEPLOYMENT_SUCCESS;
@@ -86,7 +74,8 @@ public class UpdateDeploymentForm extends DeploymentBaseForm {
     @Override
     protected void doOKAction() {
         String deploymentName = deploymentNode.getDeployment().name();
-        AzureTaskManager.getInstance().runInBackground(new AzureTask(project, "Update your azure resource (" + deploymentName + ")...", false, () -> {
+        final IAzureOperationTitle title = AzureOperationBundle.title("arm|deployment.update", deploymentName);
+        AzureTaskManager.getInstance().runInBackground(new AzureTask(project, title, false, () -> {
             EventUtil.executeWithLog(TelemetryConstants.ARM, TelemetryConstants.UPDATE_DEPLOYMENT, (operation -> {
                 Deployment.Update update = deploymentNode.getDeployment().update();
 
@@ -115,9 +104,10 @@ public class UpdateDeploymentForm extends DeploymentBaseForm {
     }
 
     private void fill() {
-        Map<String, Subscription> sidMap = AzureModel.getInstance().getSidToSubscriptionMap();
+        final List<Subscription> subscriptions = az(AzureAccount.class).account().getSelectedSubscriptions();
+        final Map<String, Subscription> sidMap = subscriptions.stream().collect(Collectors.toMap(Subscription::getId, s -> s));
         if (sidMap.containsKey(deploymentNode.getSubscriptionId())) {
-            subsNameLabel.setText(sidMap.get(deploymentNode.getSubscriptionId()).displayName());
+            subsNameLabel.setText(sidMap.get(deploymentNode.getSubscriptionId()).getName());
         }
         rgNameLabel.setText(deploymentNode.getDeployment().resourceGroupName());
         deploymentNameLabel.setText(deploymentNode.getDeployment().name());

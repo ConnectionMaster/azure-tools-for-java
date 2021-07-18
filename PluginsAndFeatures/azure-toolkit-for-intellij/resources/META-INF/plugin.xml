@@ -1,7 +1,8 @@
-<idea-plugin url="https://github.com/Microsoft/azure-tools-for-java">
+<idea-plugin url="https://github.com/Microsoft/azure-tools-for-java"
+             xmlns:xi="http://www.w3.org/2001/XInclude">
   <id>com.microsoft.tooling.msservices.intellij.azure</id>
   <name>Azure Toolkit for IntelliJ</name>
-  <version>3.48.0</version>
+  <version>3.55.0-SNAPSHOT</version>
   <vendor email="java@microsoft.com" url="http://www.microsoft.com">Microsoft</vendor>
 
   <description><![CDATA[
@@ -24,22 +25,24 @@
   <change-notes>
     <![CDATA[
     <html>
-    <h3>3.48.0</h3>
-    <h4>Changed</h4>
-    <ul>
-        <li>Update icons in Azure toolkits</li>
-        <li>Update Tomcat base images</li>
-        <li>Using non-blocking UI to replace blocking progress indicator</li>
-        <li>Remove non-functional "cancel" buttons in foreground operations</li>
-    </ul>
-    <p>You may get the full change log <a
-            href="https://github.com/Microsoft/azure-tools-for-java/blob/develop/CHANGELOG.md">here</a></p>
+        <h3>3.54.0</h3>
+        <h4>Added</h4>
+        <ul>
+            <li>User would be reminded if deprecated Azure SDK libs are used in project.</li>
+            <li>Development workflow for SQL Server on Azure: user can now connect SQL Server to local project from Azure Explorer, project, module or application.properties file.</li>
+        </ul>
+        <h4>Updated</h4>
+        <ul>
+            <li>Services are grouped by category in Azure SDK reference book so that user can quickly locate the libs they want.</li>
+            <li>Error messages are unified.</li>
+        </ul>
+        <p>You may get the full change log <a href="https://github.com/Microsoft/azure-tools-for-java/blob/develop/CHANGELOG.md">here</a></p>
     </html>
     ]]>
   </change-notes>
 
   <!-- please see https://confluence.jetbrains.com/display/IDEADEV/Build+Number+Ranges for description -->
-  <idea-version since-build="202.6397.20" until-build="202.*"/>
+  <idea-version since-build="202.6397.94" until-build="202.*"/>
   <resource-bundle>com.microsoft.intellij.ui.messages.messages</resource-bundle>
   <resource-bundle>com.microsoft.intellij.hdinsight.messages.messages</resource-bundle>
   <depends optional="true" config-file="">org.intellij.scala</depends>
@@ -49,6 +52,11 @@
   <depends>org.jetbrains.plugins.terminal</depends>
   <depends>com.intellij.gradle</depends>
   <depends optional="true">com.intellij.database</depends>
+  <xi:include href="/META-INF/operation-titles.xml" xpointer="xpointer(/idea-plugin/*)"/>
+  <xi:include href="/META-INF/azure-intellij-plugin-lib.xml" xpointer="xpointer(/idea-plugin/*)"/>
+  <xi:include href="/META-INF/azure-sdk-reference-book.xml" xpointer="xpointer(/idea-plugin/*)"/>
+  <xi:include href="/META-INF/azure-intellij-resource-connector-lib.xml" xpointer="xpointer(/idea-plugin/*)"/>
+  <xi:include href="/META-INF/azure-intellij-resource-connector-aad.xml" xpointer="xpointer(/idea-plugin/*)"/>
   <!-- please see https://confluence.jetbrains.com/display/IDEADEV/Plugin+Compatibility+with+IntelliJ+Platform+Products
        on how to target different products -->
   <!-- uncomment to enable plugin in all products
@@ -66,10 +74,8 @@
                          id="com.microsoft.intellij.AzureConfigurable"
                          provider="com.microsoft.intellij.AzureConfigurableProvider"
                          dynamic="true"/>
-    <projectService serviceInterface="com.microsoft.intellij.AzureSettings"
-                    serviceImplementation="com.microsoft.intellij.AzureSettings"/>
-    <applicationService serviceInterface="com.microsoft.intellij.ApplicationSettings"
-                        serviceImplementation="com.microsoft.intellij.ApplicationSettings"/>
+    <projectService serviceImplementation="com.microsoft.intellij.AzureSettings"/>
+    <applicationService serviceImplementation="com.microsoft.intellij.ApplicationSettings"/>
     <fileEditorProvider implementation="com.microsoft.azure.hdinsight.jobs.framework.JobViewEditorProvider" />
     <fileEditorProvider implementation="com.microsoft.azure.toolkit.intellij.function.FunctionAppPropertyViewProvider"/>
     <fileEditorProvider implementation="com.microsoft.intellij.helpers.storage.BlobExplorerFileEditorProvider"/>
@@ -82,8 +88,9 @@
     <fileEditorProvider implementation="com.microsoft.azure.toolkit.intellij.webapp.DeploymentSlotPropertyViewProvider"/>
     <fileEditorProvider implementation="com.microsoft.azure.toolkit.intellij.arm.DeploymentPropertyViewProvider"/>
     <fileEditorProvider implementation="com.microsoft.azure.toolkit.intellij.arm.ResourceTemplateViewProvider"/>
-    <fileEditorProvider implementation="com.microsoft.azure.toolkit.intellij.springcloud.SpringCloudAppPropertyViewProvider"/>
+    <fileEditorProvider implementation="com.microsoft.azure.toolkit.intellij.springcloud.properties.SpringCloudAppPropertiesEditorProvider"/>
     <fileEditorProvider implementation="com.microsoft.azure.toolkit.intellij.mysql.MySQLPropertyViewProvider"/>
+    <fileEditorProvider implementation="com.microsoft.azure.toolkit.intellij.sqlserver.properties.SqlServerPropertyViewProvider"/>
     <toolWindow
             anchor="left"
             factoryClass="com.microsoft.intellij.ui.ServerExplorerToolWindowFactory"
@@ -114,7 +121,7 @@
     <configurationType implementation="com.microsoft.azure.hdinsight.spark.run.configuration.ArisSparkConfigurationType"/>
     <configurationType implementation="com.microsoft.azure.hdinsight.spark.run.configuration.ArcadiaSparkConfigurationType"/>
     <configurationType implementation="com.microsoft.azure.toolkit.intellij.function.runner.AzureFunctionSupportConfigurationType"/>
-    <configurationType implementation="com.microsoft.azure.toolkit.intellij.springcloud.runner.SpringCloudConfigurationType"/>
+    <configurationType implementation="com.microsoft.azure.toolkit.intellij.springcloud.deplolyment.SpringCloudDeploymentConfigurationType"/>
     <configurationType implementation="com.microsoft.azure.hdinsight.spark.run.configuration.SparkFailureTaskDebugConfigurationType"/>
     <actionPromoter implementation="com.microsoft.azure.hdinsight.spark.console.SparkExecuteInConsoleActionPromoter"/>
     <runConfigurationProducer implementation="com.microsoft.azure.hdinsight.spark.run.LivySparkRunConfigurationProducer"/>
@@ -125,7 +132,7 @@
     <programRunner implementation="com.microsoft.azure.toolkit.intellij.function.runner.localrun.FunctionLocalRunner"/>
     <runConfigurationProducer implementation="com.microsoft.azure.hdinsight.spark.run.ArcadiaSparkRunConfigurationProducer"/>
     <programRunner implementation="com.microsoft.azure.toolkit.intellij.webapp.runner.webappconfig.WebAppRunner"/>
-    <programRunner implementation="com.microsoft.azure.toolkit.intellij.springcloud.runner.deploy.SpringCloudDeploymentRunner"/>
+    <programRunner implementation="com.microsoft.azure.toolkit.intellij.springcloud.deplolyment.SpringCloudDeploymentRunner"/>
     <programRunner implementation="com.microsoft.azure.hdinsight.spark.run.SparkBatchJobRunner" />
     <programRunner implementation="com.microsoft.azure.hdinsight.spark.run.CosmosSparkBatchRunner" />
     <programRunner implementation="com.microsoft.azure.hdinsight.spark.run.SparkBatchJobDebuggerRunner" />
@@ -148,6 +155,12 @@
     <runConfigurationProducer implementation="com.microsoft.azure.toolkit.intellij.function.runner.FunctionRunConfigurationProducer"/>
     <runLineMarkerContributor language="JAVA" id="functionRunLineMarkerProvider"
                               implementationClass="com.microsoft.azure.toolkit.intellij.function.runner.FunctionRunLineMarkerProvider"/>
+
+    <postStartupActivity implementation="com.microsoft.azure.toolkit.intellij.connector.mysql.MySQLDatabaseResourceConnectionStartupActivity"/>
+    <postStartupActivity implementation="com.microsoft.azure.toolkit.intellij.connector.sql.SQLDatabaseResourceConnectionStartupActivity"/>
+    <completion.contributor language="Properties" implementationClass="com.microsoft.azure.toolkit.intellij.connector.mysql.MySQLSpringDatasourceCompletionContributor"/>
+    <completion.contributor language="Properties" implementationClass="com.microsoft.azure.toolkit.intellij.connector.sql.SQLSpringDatasourceCompletionContributor"/>
+    <codeInsight.lineMarkerProvider language="Properties" implementationClass="com.microsoft.azure.toolkit.intellij.connector.database.SpringDatasourceLineMarkerProvider"/>
   </extensions>
 
   <applicationListeners>
@@ -168,7 +181,7 @@
             class="com.microsoft.intellij.actions.ApplicationInsightsAction" text="Configure Application Insights..."
             description="Configure Application Insights..." icon="/icons/ApplicationInsights_16.png"/>
     <action class="com.microsoft.intellij.actions.AzureExplorerOpenAction" id="Actions.AzureExplorerOpenAction"
-            text="Show Azure Explorer" description="Show Azure Explorer" icon="/icons/AzureExplorer_16.png"/>
+            text="Show Azure Explorer" description="Show Azure Explorer" icon="/icons/Common/Azure.svg"/>
     <action id="Actions.AzureCodeSamples"
             class="com.microsoft.intellij.actions.AzureCodeSamples"
             text="Azure Code Samples"
@@ -212,38 +225,38 @@
     <action class="com.microsoft.intellij.actions.QualtricsSurveyAction" id="AzureToolkit.Survey" text="Provide Feedback" />
     <action id="Actions.WebDeployAction" class="com.microsoft.azure.toolkit.intellij.webapp.action.WebDeployAction"
             text="Deploy to Azure Web Apps" description="Deploy to Azure Web Apps"
-            icon="/icons/PublishWebApp_16.png">
+            icon="/icons/WebApp/Deploy.svg">
     </action>
     <!-- Functions Start -->
     <action id="Actions.RunFunction" class="com.microsoft.azure.toolkit.intellij.function.action.RunFunctionAction"
             text="Run Function" description="Run function project locally"
-            icon="/icons/azure-functions-run.png">
+            icon="/icons/FunctionApp/Run.svg">
     </action>
     <action id="Actions.DeployFunction" class="com.microsoft.azure.toolkit.intellij.function.action.DeployFunctionAction"
             text="Deploy to Azure Functions" description="Deploy Java Function to Azure"
-            icon="/icons/azure-functions-deploy.png">
+            icon="/icons/FunctionApp/Deploy.svg">
     </action>
     <!-- Functions End -->
 
-    <action id="Actions.DeploySpringCloud" class="com.microsoft.azure.toolkit.intellij.springcloud.action.DeploySpringCloudAction"
+    <action id="Actions.DeploySpringCloud" class="com.microsoft.azure.toolkit.intellij.springcloud.deplolyment.DeployAppAction"
             text="Deploy to Azure Spring Cloud" description="Deploy Spring Cloud app to Azure"
-            icon="/icons/azure-springcloud-small.png">
+            icon="/icons/SpringCloud/Deploy.svg">
     </action>
     <action id="Actions.AddDockerSupport" class="com.microsoft.azure.toolkit.intellij.webapp.docker.action.AddDockerSupportAction"
             text="Add Docker Support" description="Add Docker Support"
-            icon="/icons/AddDockerSupport_16.png">
+            icon="/icons/DockerSupport/DockerSupport.svg">
     </action>
     <action id="Actions.RunOnDockerHost" class="com.microsoft.azure.toolkit.intellij.webapp.docker.action.RunOnDockerHostAction"
             text="Docker Run" description="Docker Run"
-            icon="/icons/DockerRun_16.png">
+            icon="/icons/DockerSupport/Run.svg">
     </action>
     <action id="Actions.PushImage" class="com.microsoft.azure.toolkit.intellij.webapp.docker.action.PushImageAction"
             text="Push Image" description="Push Image"
-            icon="/icons/PushImage_16.png">
+            icon="/icons/DockerSupport/PushImage.svg">
     </action>
     <action id="Actions.WebAppOnLinux" class="com.microsoft.azure.toolkit.intellij.webapp.action.WebAppOnLinuxAction"
             text="Run on Web App for Containers" description="Run on Web App for Containers"
-            icon="/icons/PublishWebAppOnLinux_16.png">
+            icon="/icons/DockerSupport/RunOnWebApp.svg">
     </action>
     <action id="Actions.SparkJobDisconnect" class="com.microsoft.azure.hdinsight.spark.run.action.SparkBatchJobDisconnectAction"
             text="Disconnect" description="Disconnect the log view from remote Spark Job"
@@ -274,13 +287,15 @@
             text="SparkJobRun"/>
     <action id="SparkJobDebug" class="com.microsoft.azure.hdinsight.spark.run.action.SparkJobDebugAction"
             text="SparkJobDebug"/>
-    <action id="Actions.AddAzureDependencyAction" class="com.microsoft.azure.toolkit.intellij.springcloud.action.AddAzureDependencyAction" text="Add Azure Spring Cloud dependency" icon="/icons/azure-springcloud-app-dependency.png">
+    <action id="Actions.AddAzureDependencyAction" class="com.microsoft.azure.toolkit.intellij.springcloud.dependency.AddDependencyAction" text="Add Azure Spring Cloud dependency" icon="/icons/SpringCloud/AddDependency.svg">
     </action>
-    <action id="Actions.AddAzureDependencyContextAction" class="com.microsoft.azure.toolkit.intellij.springcloud.action.AddAzureDependencyContextAction" text="Add Azure Spring Cloud dependency" icon="/icons/azure-springcloud-app-dependency.png">
+    <action id="Actions.AddAzureDependencyContextAction" class="com.microsoft.azure.toolkit.intellij.springcloud.dependency.AddDependencyContextAction" text="Add Azure Spring Cloud dependency" icon="/icons/SpringCloud/AddDependency.svg">
       <add-to-group group-id="RunContextPopupGroup" anchor="last"/>
     </action>
 
     <group id="AzurePopupGroup" text="Azure" description="Azure" icon="/icons/Common/Azure.svg" popup="true" class="com.microsoft.intellij.actions.AzurePopupGroup">
+      <reference ref="AzureToolkit.ConnectToAzureResource"/>
+      <separator/>
       <reference ref="Actions.RunFunction"/>
       <reference ref="Actions.DeployFunction"/>
       <separator/>
@@ -311,7 +326,7 @@
            class="com.intellij.openapi.actionSystem.DefaultActionGroup"
            text="Azure"
            description="Contains Azure tools plugin actions"
-           icon="/icons/azure.png"
+           icon="/icons/Common/Azure.svg"
            popup="true">
       <add-to-group group-id="ToolsMenu" anchor="first"/>
       <reference ref="AzureToolkit.SelectSubscriptions"/>
@@ -319,6 +334,8 @@
       <reference ref="AzureToolkit.AzureSignIn"/>
       <separator/>
       <reference ref="AzureToolkit.ValidateCertificate"/>
+      <separator/>
+      <reference ref="AzureToolkit.OpenSdkReferenceBook"/>
       <separator/>
       <reference ref="AzureToolkit.GithubIssue"/>
       <reference ref="AzureToolkit.FeatureRequest"/>

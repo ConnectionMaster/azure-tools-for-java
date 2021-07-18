@@ -1,23 +1,6 @@
 /*
- * Copyright (c) Microsoft Corporation
- *
- * All rights reserved.
- *
- * MIT License
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
- * documentation files (the "Software"), to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and
- * to permit persons to whom the Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all copies or substantial portions of
- * the Software.
- *
- * THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
- * THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Licensed under the MIT License. See License.txt in the project root for license information.
  */
 
 package com.microsoft.intellij;
@@ -43,40 +26,61 @@ import com.intellij.util.PlatformUtils;
 import com.intellij.util.containers.HashSet;
 import com.microsoft.applicationinsights.preference.ApplicationInsightsResource;
 import com.microsoft.applicationinsights.preference.ApplicationInsightsResourceRegistry;
+import com.microsoft.azure.toolkit.intellij.azuresdk.dependencesurvey.activity.WorkspaceTaggingActivity;
+import com.microsoft.azure.toolkit.intellij.azuresdk.enforcer.AzureSdkEnforcer;
+import com.microsoft.azure.toolkit.lib.Azure;
+import com.microsoft.azure.toolkit.lib.common.utils.InstallationIdUtils;
 import com.microsoft.azuretools.authmanage.CommonSettings;
 import com.microsoft.azuretools.azurecommons.deploy.DeploymentEventArgs;
 import com.microsoft.azuretools.azurecommons.deploy.DeploymentEventListener;
 import com.microsoft.azuretools.azurecommons.helpers.StringHelper;
-import com.microsoft.azuretools.azurecommons.util.*;
+import com.microsoft.azuretools.azurecommons.util.FileUtil;
+import com.microsoft.azuretools.azurecommons.util.ParserXMLUtility;
+import com.microsoft.azuretools.azurecommons.util.Utils;
+import com.microsoft.azuretools.azurecommons.util.WAEclipseHelperMethods;
 import com.microsoft.azuretools.azurecommons.xmlhandling.DataOperations;
 import com.microsoft.azuretools.telemetry.AppInsightsClient;
 import com.microsoft.azuretools.telemetry.AppInsightsConstants;
 import com.microsoft.azuretools.telemetrywrapper.EventType;
 import com.microsoft.azuretools.telemetrywrapper.EventUtil;
 import com.microsoft.azuretools.utils.TelemetryUtils;
-import com.microsoft.intellij.helpers.CustomerSurveyHelper;
 import com.microsoft.intellij.helpers.WhatsNewManager;
 import com.microsoft.intellij.ui.libraries.AILibraryHandler;
 import com.microsoft.intellij.ui.libraries.AzureLibrary;
 import com.microsoft.intellij.ui.messages.AzureBundle;
 import com.microsoft.intellij.util.PluginHelper;
 import com.microsoft.intellij.util.PluginUtil;
+import com.microsoft.rest.LogLevel;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.StringUtils;
 import org.jetbrains.annotations.NotNull;
 import org.w3c.dom.Document;
+import rx.Observable;
+import rx.schedulers.Schedulers;
 
 import javax.swing.event.EventListenerList;
-import java.io.*;
+import java.io.BufferedOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
-import static com.microsoft.azuretools.telemetry.TelemetryConstants.*;
+import static com.microsoft.azuretools.telemetry.TelemetryConstants.PLUGIN_INSTALL;
+import static com.microsoft.azuretools.telemetry.TelemetryConstants.PLUGIN_LOAD;
+import static com.microsoft.azuretools.telemetry.TelemetryConstants.PLUGIN_UNINSTALL;
+import static com.microsoft.azuretools.telemetry.TelemetryConstants.PLUGIN_UPGRADE;
+import static com.microsoft.azuretools.telemetry.TelemetryConstants.SHOW_WHATS_NEW;
+import static com.microsoft.azuretools.telemetry.TelemetryConstants.SYSTEM;
 import static com.microsoft.intellij.ui.messages.AzureBundle.message;
 
 
@@ -87,6 +91,7 @@ public class AzurePlugin implements StartupActivity.DumbAware {
     public static final String JDBC_LIBRARIES_VERSION = "6.1.0.jre8";
     public static final int REST_SERVICE_MAX_RETRY_COUNT = 7;
     private static PluginStateListener pluginStateListener = null;
+    private static final int POP_UP_DELAY = 30;
 
     // User-agent header for Azure SDK calls
     public static final String USER_AGENT = "Azure Toolkit for IntelliJ, v%s, machineid:%s";
@@ -109,15 +114,19 @@ public class AzurePlugin implements StartupActivity.DumbAware {
 
     @Override
     public void runActivity(@NotNull Project project) {
+        ProxyUtils.initProxy();
+
         this.azureSettings = AzureSettings.getSafeInstance(project);
-        String hasMac = GetHashMac.getHashMac();
-        this.installationID = StringUtils.isNotEmpty(hasMac) ? hasMac : GetHashMac.hash(PermanentInstallationID.get());
-        CommonSettings.setUserAgent(String.format(USER_AGENT, PLUGIN_VERSION,
-                TelemetryUtils.getMachieId(dataFile, message("prefVal"), message("instID"))));
+        String hasMac = InstallationIdUtils.getHashMac();
+        this.installationID = StringUtils.isNotEmpty(hasMac) ? hasMac : InstallationIdUtils.hash(PermanentInstallationID.get());
+        final String userAgent = String.format(USER_AGENT, PLUGIN_VERSION,
+                TelemetryUtils.getMachieId(dataFile, message("prefVal"), message("instID")));
+        Azure.az().config().setLogLevel(LogLevel.NONE.name());
+        Azure.az().config().setUserAgent(userAgent);
+        CommonSettings.setUserAgent(userAgent);
 
         initializeAIRegistry(project);
         // Showing dialog needs to be run in UI thread
-        initializeFeedbackNotification(project);
         initializeWhatsNew(project);
 
         if (!IS_ANDROID_STUDIO) {
@@ -129,6 +138,7 @@ public class AzurePlugin implements StartupActivity.DumbAware {
                 initializeTelemetry();
                 clearTempDirectory();
                 loadWebappsSettings(project);
+                afterInitialization(project);
             } catch (ProcessCanceledException e) {
                 throw e;
             } catch (Exception e) {
@@ -149,8 +159,14 @@ public class AzurePlugin implements StartupActivity.DumbAware {
             });
     }
 
-    private void initializeFeedbackNotification(Project myProject) {
-        CustomerSurveyHelper.INSTANCE.showFeedbackNotification(myProject);
+    private void afterInitialization(Project myProject) {
+        Observable.timer(POP_UP_DELAY, TimeUnit.SECONDS)
+                .subscribeOn(Schedulers.newThread())
+                .take(1)
+                .subscribe(next -> {
+                    WorkspaceTaggingActivity.runActivity(myProject);
+                    AzureSdkEnforcer.enforce(myProject);
+                });
     }
 
     private synchronized void initializeTelemetry() throws Exception {
@@ -173,7 +189,7 @@ public class AzurePlugin implements StartupActivity.DumbAware {
                     String instID = DataOperations.getProperty(dataFile, message("instID"));
                     if (prefValue == null || prefValue.isEmpty()) {
                         setValues(dataFile);
-                    } else if (StringUtils.isEmpty(instID) || !GetHashMac.isValidHashMac(instID)) {
+                    } else if (StringUtils.isEmpty(instID) || !InstallationIdUtils.isValidHashMac(instID)) {
                         upgrade = true;
                         Document doc = ParserXMLUtility.parseXMLFile(dataFile);
 

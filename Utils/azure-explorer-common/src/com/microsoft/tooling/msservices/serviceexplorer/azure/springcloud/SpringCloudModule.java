@@ -1,49 +1,27 @@
 /*
- * Copyright (c) Microsoft Corporation
- *
- * All rights reserved.
- *
- * MIT License
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
- * documentation files (the "Software"), to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and
- * to permit persons to whom the Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all copies or substantial portions of
- * the Software.
- *
- * THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
- * THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Licensed under the MIT License. See License.txt in the project root for license information.
  */
 
 package com.microsoft.tooling.msservices.serviceexplorer.azure.springcloud;
 
-import com.microsoft.azure.management.appplatform.v2020_07_01.implementation.ServiceResourceInner;
+import com.microsoft.azure.toolkit.lib.Azure;
+import com.microsoft.azure.toolkit.lib.common.operation.AzureOperation;
+import com.microsoft.azure.toolkit.lib.springcloud.AzureSpringCloud;
 import com.microsoft.azuretools.azurecommons.helpers.AzureCmdException;
 import com.microsoft.azuretools.azurecommons.helpers.Nullable;
-import com.microsoft.azuretools.core.mvp.model.springcloud.SpringCloudIdHelper;
 import com.microsoft.tooling.msservices.serviceexplorer.AzureIconSymbol;
 import com.microsoft.tooling.msservices.serviceexplorer.AzureRefreshableNode;
 import com.microsoft.tooling.msservices.serviceexplorer.Node;
 
-import java.util.List;
-
-public class SpringCloudModule extends AzureRefreshableNode implements SpringCloudModuleView {
-    protected static final String ICON_FILE = "azure-springcloud-small.png";
+public class SpringCloudModule extends AzureRefreshableNode {
     private static final String SPRING_SERVICE_MODULE_ID = SpringCloudModule.class.getName();
-    private static final String BASE_MODULE_NAME = "Spring Cloud(Preview)";
-    private final SpringCloudModulePresenter<SpringCloudModule> springCloudModulePresenter;
+    private static final String BASE_MODULE_NAME = "Spring Cloud";
 
     public static final String MODULE_NAME = "Spring Cloud";
 
     public SpringCloudModule(final Node parent) {
-        super(SPRING_SERVICE_MODULE_ID, BASE_MODULE_NAME, parent, ICON_FILE);
-        springCloudModulePresenter = new SpringCloudModulePresenter<>();
-        springCloudModulePresenter.onAttachView(this);
+        super(SPRING_SERVICE_MODULE_ID, BASE_MODULE_NAME, parent, null);
     }
 
     @Override
@@ -52,18 +30,12 @@ public class SpringCloudModule extends AzureRefreshableNode implements SpringClo
     }
 
     @Override
+    @AzureOperation(name = "springcloud|cluster.list.subscription|selected", type = AzureOperation.Type.ACTION)
     protected void refreshItems() throws AzureCmdException {
-        springCloudModulePresenter.onSpringCloudRefresh();
-    }
-
-    @Override
-    public void renderChildren(final List<ServiceResourceInner> springCloudServices) {
-        for (final ServiceResourceInner resourceEx : springCloudServices) {
-            final SpringCloudNode node = new SpringCloudNode(this,
-                                                             SpringCloudIdHelper.getSubscriptionId(resourceEx.id()),
-                                                             resourceEx);
+        Azure.az(AzureSpringCloud.class).clusters(true).forEach(cluster -> {
+            final SpringCloudNode node = new SpringCloudNode(this, cluster);
             addChildNode(node);
-        }
+        });
     }
 
     @Override

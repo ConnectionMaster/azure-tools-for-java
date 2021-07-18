@@ -1,29 +1,15 @@
 /*
- * Copyright (c) Microsoft Corporation
- *
- * All rights reserved.
- *
- * MIT License
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
- * documentation files (the "Software"), to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and
- * to permit persons to whom the Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all copies or substantial portions of
- * the Software.
- *
- * THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
- * THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Licensed under the MIT License. See License.txt in the project root for license information.
  */
 
 package com.microsoft.tooling.msservices.serviceexplorer;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterators;
+import com.microsoft.azure.toolkit.lib.Azure;
+import com.microsoft.azure.toolkit.lib.auth.AzureAccount;
+import com.microsoft.azure.toolkit.lib.common.model.Subscription;
 import com.microsoft.azure.toolkit.lib.common.operation.AzureOperation;
 import com.microsoft.azuretools.authmanage.AuthMethodManager;
 import com.microsoft.azuretools.azurecommons.helpers.NotNull;
@@ -438,20 +424,20 @@ public class Node implements MvpView, BasicTelemetryProperty, Sortable {
         return TelemetryConstants.ACTION;
     }
 
-    @AzureOperation(value = "open setting page in portal", type = AzureOperation.Type.ACTION)
-    public void openResourcesInPortal(String subscriptionId, String resourceRelativePath) {
+    @AzureOperation(name = "common.open_portal", params = {"nameFromResourceId(resourceId)"}, type = AzureOperation.Type.ACTION)
+    public void openResourcesInPortal(String subscriptionId, String resourceId) {
         final AzureManager azureManager = AuthMethodManager.getInstance().getAzureManager();
         // not signed in
         if (azureManager == null) {
             return;
         }
         final String portalUrl = azureManager.getPortalUrl();
-        final String tenantId = azureManager.getTenantIdBySubscription(subscriptionId);
+        Subscription subscription = Azure.az(AzureAccount.class).account().getSubscription(subscriptionId);
         final String url = portalUrl
                 + REST_SEGMENT_JOB_MANAGEMENT_TENANTID
-                + tenantId
+                + subscription.getTenantId()
                 + REST_SEGMENT_JOB_MANAGEMENT_RESOURCE
-                + resourceRelativePath;
+                + resourceId;
         DefaultLoader.getIdeHelper().openLinkInBrowser(url);
     }
 

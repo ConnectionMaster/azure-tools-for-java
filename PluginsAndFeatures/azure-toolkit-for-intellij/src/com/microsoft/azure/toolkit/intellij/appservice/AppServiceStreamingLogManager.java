@@ -1,48 +1,38 @@
 /*
- * Copyright (c) Microsoft Corporation
- *
- * All rights reserved.
- *
- * MIT License
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
- * documentation files (the "Software"), to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and
- * to permit persons to whom the Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all copies or substantial portions of
- * the Software.
- *
- * THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
- * THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Licensed under the MIT License. See License.txt in the project root for license information.
  */
 package com.microsoft.azure.toolkit.intellij.appservice;
 
+import com.azure.resourcemanager.resources.fluentcore.arm.ResourceUtils;
 import com.google.gson.JsonObject;
 import com.intellij.openapi.project.Project;
 import com.microsoft.azure.management.applicationinsights.v2015_05_01.ApplicationInsightsComponent;
-import com.microsoft.azure.management.appservice.*;
+import com.microsoft.azure.toolkit.lib.Azure;
+import com.microsoft.azure.toolkit.lib.appservice.AzureAppService;
+import com.microsoft.azure.toolkit.lib.appservice.model.DiagnosticConfig;
+import com.microsoft.azure.toolkit.lib.appservice.model.OperatingSystem;
+import com.microsoft.azure.toolkit.lib.appservice.service.IFunctionApp;
+import com.microsoft.azure.toolkit.lib.appservice.service.IWebApp;
+import com.microsoft.azure.toolkit.lib.appservice.service.IWebAppDeploymentSlot;
 import com.microsoft.azure.toolkit.lib.common.exception.AzureToolkitRuntimeException;
+import com.microsoft.azure.toolkit.lib.common.operation.AzureOperation;
+import com.microsoft.azure.toolkit.lib.common.operation.AzureOperationBundle;
+import com.microsoft.azure.toolkit.lib.common.operation.IAzureOperationTitle;
 import com.microsoft.azure.toolkit.lib.common.task.AzureTask;
 import com.microsoft.azure.toolkit.lib.common.task.AzureTaskManager;
-import com.microsoft.azuretools.authmanage.AuthMethodManager;
-import com.microsoft.azuretools.authmanage.models.SubscriptionDetail;
 import com.microsoft.azuretools.core.mvp.model.AzureMvpModel;
-import com.microsoft.azuretools.core.mvp.model.function.AzureFunctionMvpModel;
-import com.microsoft.azuretools.core.mvp.model.webapp.AzureWebAppMvpModel;
-import com.microsoft.azuretools.sdkmanage.AzureManager;
+import com.microsoft.azuretools.sdkmanage.IdentityAzureManager;
 import com.microsoft.intellij.util.PluginUtil;
 import com.microsoft.tooling.msservices.components.DefaultLoader;
 import com.microsoft.tooling.msservices.helpers.azure.sdk.AzureSDKManager;
 import org.apache.commons.lang3.StringUtils;
-import rx.Observable;
+import reactor.core.publisher.Flux;
 
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -54,10 +44,8 @@ public enum AppServiceStreamingLogManager {
     INSTANCE;
 
     private static final String STREAMING_LOG_NOT_STARTED = message("appService.logStreaming.hint.notStart");
-    private static final String STARTING_STREAMING_LOG = message("appService.logStreaming.hint.start");
     private static final String FAILED_TO_START_STREAMING_LOG = message("appService.logStreaming.error.startFailed");
     private static final String FAILED_TO_CLOSE_STREAMING_LOG = message("appService.logStreaming.error.closeFailed");
-    private static final String CLOSING_STREAMING_LOG = message("appService.logStreaming.hint.closing");
     private static final String ENABLE_LOGGING = "Enable logging";
     private static final String NOT_SUPPORTED = "Not supported";
     private static final String SITES = "sites";
@@ -65,7 +53,7 @@ public enum AppServiceStreamingLogManager {
     private static final String SUBSCRIPTIONS = "subscriptions";
     private static final String[] YES_NO = {"Yes", "No"};
 
-    private Map<String, AppServiceStreamingLogConsoleView> consoleViewMap = new HashMap<>();
+    private final Map<String, AppServiceStreamingLogConsoleView> consoleViewMap = new HashMap<>();
 
     public void showWebAppDeploymentSlotStreamingLog(Project project, String slotId) {
         showAppServiceStreamingLog(project, slotId, new WebAppSlotLogStreaming(slotId));
@@ -79,8 +67,10 @@ public enum AppServiceStreamingLogManager {
         showAppServiceStreamingLog(project, functionId, new FunctionLogStreaming(functionId));
     }
 
+    @AzureOperation(name = "appservice|log_stream.close", params = {"nameFromResourceId(appId)"}, type = AzureOperation.Type.SERVICE)
     public void closeStreamingLog(Project project, String appId) {
-        AzureTaskManager.getInstance().runInBackground(new AzureTask(project, CLOSING_STREAMING_LOG, false, () -> {
+        final IAzureOperationTitle title = AzureOperationBundle.title("appservice|log_stream.close", ResourceUtils.nameFromResourceId(appId));
+        AzureTaskManager.getInstance().runInBackground(new AzureTask(project, title, false, () -> {
             if (consoleViewMap.containsKey(appId) && consoleViewMap.get(appId).isActive()) {
                 consoleViewMap.get(appId).closeStreamingLog();
             } else {
@@ -90,8 +80,10 @@ public enum AppServiceStreamingLogManager {
         }));
     }
 
+    @AzureOperation(name = "appservice|log_stream.open", params = {"nameFromResourceId(resourceId)"}, type = AzureOperation.Type.SERVICE)
     private void showAppServiceStreamingLog(Project project, String resourceId, ILogStreaming logStreaming) {
-        AzureTaskManager.getInstance().runInBackground(new AzureTask(project, STARTING_STREAMING_LOG, false, () -> {
+        final IAzureOperationTitle title = AzureOperationBundle.title("appservice|log_stream.open", ResourceUtils.nameFromResourceId(resourceId));
+        AzureTaskManager.getInstance().runInBackground(new AzureTask(project, title, false, () -> {
             try {
                 final String name = logStreaming.getTitle();
                 final AppServiceStreamingLogConsoleView consoleView = getOrCreateConsoleView(project, resourceId);
@@ -111,7 +103,7 @@ public enum AppServiceStreamingLogManager {
                             return;
                         }
                     }
-                    final Observable<String> log = logStreaming.getStreamingLogContent();
+                    final Flux<String> log = logStreaming.getStreamingLogContent();
                     if (log == null) {
                         return;
                     }
@@ -119,20 +111,19 @@ public enum AppServiceStreamingLogManager {
                 }
                 StreamingLogsToolWindowManager.getInstance().showStreamingLogConsole(
                         project, resourceId, logStreaming.getTitle(), consoleView);
-            } catch (Throwable e) {
+            } catch (final Throwable e) {
                 throw new AzureToolkitRuntimeException("failed to open streaming log", e);
             }
         }));
     }
 
     private AppServiceStreamingLogConsoleView getOrCreateConsoleView(Project project, String resourceId) {
-        return consoleViewMap.compute(resourceId, (id, view) -> {
-            return (view == null || view.isDisposed()) ? new AppServiceStreamingLogConsoleView(project, id) : view;
-        });
+        return consoleViewMap.compute(resourceId,
+                                      (id, view) -> (view == null || view.isDisposed()) ? new AppServiceStreamingLogConsoleView(project, id) : view);
     }
 
     interface ILogStreaming {
-        default boolean isLogStreamingSupported() throws IOException {
+        default boolean isLogStreamingSupported() {
             return true;
         }
 
@@ -142,7 +133,7 @@ public enum AppServiceStreamingLogManager {
 
         String getTitle() throws IOException;
 
-        Observable<String> getStreamingLogContent() throws IOException;
+        Flux<String> getStreamingLogContent() throws IOException;
     }
 
     static class FunctionLogStreaming implements ILogStreaming {
@@ -151,22 +142,24 @@ public enum AppServiceStreamingLogManager {
         private static final String APPLICATION_INSIGHT_PATTERN = "%s/#blade/AppInsightsExtension/QuickPulseBladeV2/ComponentId/%s/ResourceId/%s";
         private static final String MUST_CONFIGURE_APPLICATION_INSIGHTS = message("appService.logStreaming.error.noApplicationInsights");
 
-        private String resourceId;
-        private FunctionApp functionApp;
+        private final String resourceId;
+        private IFunctionApp functionApp;
 
         FunctionLogStreaming(final String resourceId) {
             this.resourceId = resourceId;
         }
 
         @Override
-        public boolean isLogStreamingEnabled() throws IOException {
-            return getFunctionApp().operatingSystem() == OperatingSystem.LINUX ?
-                   true : AzureFunctionMvpModel.isApplicationLogEnabled(getFunctionApp());
+        public boolean isLogStreamingEnabled() {
+            return getFunctionApp().getRuntime().getOperatingSystem() == OperatingSystem.LINUX ||
+                    getFunctionApp().getDiagnosticConfig().isEnableApplicationLog();
         }
 
         @Override
-        public void enableLogStreaming() throws IOException {
-            AzureFunctionMvpModel.enableApplicationLog(getFunctionApp());
+        public void enableLogStreaming() {
+            final DiagnosticConfig diagnosticConfig = getFunctionApp().getDiagnosticConfig();
+            diagnosticConfig.setEnableApplicationLog(true);
+            getFunctionApp().update().withDiagnosticConfig(diagnosticConfig).commit();
         }
 
         @Override
@@ -175,8 +168,8 @@ public enum AppServiceStreamingLogManager {
         }
 
         @Override
-        public Observable<String> getStreamingLogContent() throws IOException {
-            if (getFunctionApp().operatingSystem() == OperatingSystem.LINUX) {
+        public Flux<String> getStreamingLogContent() throws IOException {
+            if (getFunctionApp().getRuntime().getOperatingSystem() == OperatingSystem.LINUX) {
                 // For linux function, we will just open the "Live Metrics Stream" view in the portal
                 openLiveMetricsStream();
                 return null;
@@ -187,120 +180,105 @@ public enum AppServiceStreamingLogManager {
         // Refers https://github.com/microsoft/vscode-azurefunctions/blob/v0.22.0/src/
         // commands/logstream/startStreamingLogs.ts#L53
         private void openLiveMetricsStream() throws IOException {
-            final AppSetting aiAppSettings = functionApp.getAppSettings().get(APPINSIGHTS_INSTRUMENTATIONKEY);
-            if (aiAppSettings == null) {
+            final String aiKey = functionApp.entity().getAppSettings().get(APPINSIGHTS_INSTRUMENTATIONKEY);
+            if (StringUtils.isEmpty(aiKey)) {
                 throw new IOException(MUST_CONFIGURE_APPLICATION_INSIGHTS);
             }
-            final String aiKey = aiAppSettings.value();
             final String subscriptionId = AzureMvpModel.getSegment(resourceId, SUBSCRIPTIONS);
-            final AzureManager azureManager = AuthMethodManager.getInstance().getAzureManager();
-            final SubscriptionDetail subscriptionDetail = azureManager.getSubscriptionManager()
-                                                                      .getSubscriptionIdToSubscriptionDetailsMap()
-                                                                      .get(subscriptionId);
             final List<ApplicationInsightsComponent> insightsResources =
-                    AzureSDKManager.getInsightsResources(subscriptionDetail);
+                    subscriptionId == null ? Collections.EMPTY_LIST : AzureSDKManager.getInsightsResources(subscriptionId);
             final ApplicationInsightsComponent target = insightsResources
                     .stream()
                     .filter(aiResource -> StringUtils.equals(aiResource.instrumentationKey(), aiKey))
                     .findFirst()
                     .orElseThrow(() -> new IOException(message("appService.logStreaming.error.aiNotFound", subscriptionId)));
-            final String aiUrl = getApplicationInsightLiveMetricsUrl(target, azureManager.getPortalUrl());
+            final String aiUrl = getApplicationInsightLiveMetricsUrl(target, IdentityAzureManager.getInstance().getPortalUrl());
             DefaultLoader.getIdeHelper().openLinkInBrowser(aiUrl);
         }
 
-        private String getApplicationInsightLiveMetricsUrl(ApplicationInsightsComponent target, String portalUrl)
-                throws UnsupportedEncodingException {
+        private String getApplicationInsightLiveMetricsUrl(ApplicationInsightsComponent target, String portalUrl) {
             final JsonObject componentObject = new JsonObject();
             componentObject.addProperty("Name", target.name());
             componentObject.addProperty("SubscriptionId", AzureMvpModel.getSegment(target.id(), SUBSCRIPTIONS));
             componentObject.addProperty("ResourceGroup", target.resourceGroupName());
-            final String componentId = URLEncoder.encode(componentObject.toString(), "utf-8");
-            final String aiResourceId = URLEncoder.encode(target.id(), "utf-8");
+            final String componentId = URLEncoder.encode(componentObject.toString(), StandardCharsets.UTF_8);
+            final String aiResourceId = URLEncoder.encode(target.id(), StandardCharsets.UTF_8);
             return String.format(APPLICATION_INSIGHT_PATTERN, portalUrl, componentId, aiResourceId);
         }
 
-        private FunctionApp getFunctionApp() throws IOException {
+        private IFunctionApp getFunctionApp() {
             if (functionApp == null) {
-                functionApp = AzureFunctionMvpModel.getInstance().getFunctionById(
-                        AzureMvpModel.getSegment(resourceId, SUBSCRIPTIONS), resourceId);
+                functionApp = Azure.az(AzureAppService.class).functionApp(resourceId);
             }
             return functionApp;
         }
     }
 
     static class WebAppLogStreaming implements ILogStreaming {
-        private String resourceId;
-        private WebApp webApp;
+        private final IWebApp webApp;
 
         public WebAppLogStreaming(String resourceId) {
-            this.resourceId = resourceId;
+            this.webApp = Azure.az(AzureAppService.class).webapp(resourceId);
         }
 
         @Override
-        public boolean isLogStreamingEnabled() throws IOException {
-            return AzureWebAppMvpModel.isHttpLogEnabled(getWebApp());
+        public boolean isLogStreamingEnabled() {
+            return webApp.getDiagnosticConfig().isEnableWebServerLogging();
         }
 
         @Override
-        public void enableLogStreaming() throws IOException {
-            AzureWebAppMvpModel.enableHttpLog(getWebApp().update());
+        public void enableLogStreaming() {
+            final DiagnosticConfig diagnosticConfig = webApp.getDiagnosticConfig();
+            webApp.update().withDiagnosticConfig(enableHttpLog(diagnosticConfig)).commit();
         }
 
         @Override
         public String getTitle() {
-            return AzureMvpModel.getSegment(resourceId, SITES);
+            return AzureMvpModel.getSegment(webApp.id(), SITES);
         }
 
         @Override
-        public Observable<String> getStreamingLogContent() throws IOException {
-            return getWebApp().streamAllLogsAsync();
-        }
-
-        private WebApp getWebApp() throws IOException {
-            if (webApp == null) {
-                webApp = AzureWebAppMvpModel.getInstance().getWebAppById(
-                        AzureMvpModel.getSegment(resourceId, SUBSCRIPTIONS), resourceId);
-            }
-            return webApp;
+        public Flux<String> getStreamingLogContent() {
+            return webApp.streamAllLogsAsync();
         }
     }
 
     static class WebAppSlotLogStreaming implements ILogStreaming {
-        private String resourceId;
-        private DeploymentSlot deploymentSlot;
+        private final IWebAppDeploymentSlot deploymentSlot;
 
         public WebAppSlotLogStreaming(String resourceId) {
-            this.resourceId = resourceId;
+            this.deploymentSlot = Azure.az(AzureAppService.class).deploymentSlot(resourceId);
         }
 
         @Override
-        public boolean isLogStreamingEnabled() throws IOException {
-            return AzureWebAppMvpModel.isHttpLogEnabled(getDeploymentSlot());
+        public boolean isLogStreamingEnabled() {
+            return deploymentSlot.getDiagnosticConfig().isEnableWebServerLogging();
         }
 
         @Override
-        public void enableLogStreaming() throws IOException {
-            AzureWebAppMvpModel.enableHttpLog(getDeploymentSlot().update());
+        public void enableLogStreaming() {
+            final DiagnosticConfig diagnosticConfig = deploymentSlot.getDiagnosticConfig();
+            deploymentSlot.update().withDiagnosticConfig(enableHttpLog(diagnosticConfig)).commit();
         }
 
         @Override
         public String getTitle() {
-            return AzureMvpModel.getSegment(resourceId, SLOTS);
+            return AzureMvpModel.getSegment(deploymentSlot.id(), SLOTS);
         }
 
         @Override
-        public Observable<String> getStreamingLogContent() throws IOException {
-            return getDeploymentSlot().streamAllLogsAsync();
+        public Flux<String> getStreamingLogContent() {
+            return deploymentSlot.streamAllLogsAsync();
         }
+    }
 
-        private DeploymentSlot getDeploymentSlot() throws IOException {
-            if (deploymentSlot == null) {
-                final String subscriptionId = AzureMvpModel.getSegment(resourceId, SUBSCRIPTIONS);
-                final String webAppId = resourceId.substring(0, resourceId.indexOf("/slots"));
-                final WebApp webApp = AzureWebAppMvpModel.getInstance().getWebAppById(subscriptionId, webAppId);
-                deploymentSlot = webApp.deploymentSlots().getById(resourceId);
-            }
-            return deploymentSlot;
-        }
+    // Refers values from Azure app service SDK
+    // https://github.com/Azure/azure-sdk-for-java/blob/azure-resourcemanager-appservice_2.3.0/sdk/resourcemanager/azure-resourcemanager-appservice/src/
+    // main/java/com/azure/resourcemanager/appservice/implementation/WebAppBaseImpl.java#L1565
+    private static DiagnosticConfig enableHttpLog(DiagnosticConfig config) {
+        config.setEnableWebServerLogging(true);
+        config.setWebServerLogQuota(35);
+        config.setWebServerRetentionPeriod(0);
+        return config;
     }
 }

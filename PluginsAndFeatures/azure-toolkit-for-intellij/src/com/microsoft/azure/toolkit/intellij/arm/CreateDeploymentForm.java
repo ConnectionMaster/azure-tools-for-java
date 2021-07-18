@@ -1,23 +1,6 @@
 /*
- * Copyright (c) Microsoft Corporation
- *
- * All rights reserved.
- *
- * MIT License
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
- * documentation files (the "Software"), to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and
- * to permit persons to whom the Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all copies or substantial portions of
- * the Software.
- *
- * THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
- * THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Licensed under the MIT License. See License.txt in the project root for license information.
  */
 
 package com.microsoft.azure.toolkit.intellij.arm;
@@ -30,44 +13,49 @@ import com.intellij.openapi.ui.TextFieldWithBrowseButton;
 import com.intellij.openapi.wm.StatusBar;
 import com.intellij.openapi.wm.WindowManager;
 import com.intellij.ui.HyperlinkLabel;
-import com.microsoft.azure.management.Azure;
+import com.intellij.ui.SimpleListCellRenderer;
 import com.microsoft.azure.management.resources.Deployment;
 import com.microsoft.azure.management.resources.Deployment.DefinitionStages.WithTemplate;
 import com.microsoft.azure.management.resources.DeploymentMode;
-import com.microsoft.azure.management.resources.Location;
-import com.microsoft.azure.management.resources.ResourceGroup;
-import com.microsoft.azure.management.resources.fluentcore.arm.Region;
+import com.microsoft.azure.toolkit.intellij.appservice.region.RegionComboBox;
+import com.microsoft.azure.toolkit.intellij.appservice.subscription.SubscriptionComboBox;
+import com.microsoft.azure.toolkit.lib.Azure;
+import com.microsoft.azure.toolkit.lib.auth.AzureAccount;
+import com.microsoft.azure.toolkit.lib.common.model.Region;
+import com.microsoft.azure.toolkit.lib.common.model.ResourceGroup;
+import com.microsoft.azure.toolkit.lib.common.model.Subscription;
+import com.microsoft.azure.toolkit.lib.common.operation.AzureOperationBundle;
+import com.microsoft.azure.toolkit.lib.common.operation.IAzureOperationTitle;
 import com.microsoft.azure.toolkit.lib.common.task.AzureTask;
 import com.microsoft.azure.toolkit.lib.common.task.AzureTaskManager;
 import com.microsoft.azuretools.authmanage.AuthMethodManager;
-import com.microsoft.azuretools.authmanage.models.SubscriptionDetail;
 import com.microsoft.azuretools.core.mvp.model.AzureMvpModel;
 import com.microsoft.azuretools.core.mvp.model.ResourceEx;
 import com.microsoft.azuretools.telemetry.TelemetryConstants;
 import com.microsoft.azuretools.telemetrywrapper.EventType;
 import com.microsoft.azuretools.telemetrywrapper.EventUtil;
-import com.microsoft.azuretools.utils.AzureModel;
-import com.microsoft.azuretools.utils.AzureModelController;
 import com.microsoft.azuretools.utils.AzureUIRefreshCore;
 import com.microsoft.azuretools.utils.AzureUIRefreshEvent;
-import com.microsoft.intellij.AzurePlugin;
 import com.microsoft.intellij.ui.util.UIUtils;
-import com.microsoft.intellij.ui.util.UIUtils.ElementWrapper;
 import com.microsoft.tooling.msservices.serviceexplorer.azure.arm.ResourceManagementNode;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.Nullable;
 
-import javax.swing.*;
+import javax.swing.ButtonGroup;
+import javax.swing.JComboBox;
+import javax.swing.JComponent;
+import javax.swing.JLabel;
+import javax.swing.JList;
+import javax.swing.JPanel;
+import javax.swing.JRadioButton;
+import javax.swing.JTextField;
 import java.io.FileReader;
-import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 
-import static com.microsoft.azuretools.telemetry.TelemetryConstants.BROWSE_TEMPLATE_SAMPLES;
 import static com.microsoft.azure.toolkit.intellij.arm.action.CreateDeploymentAction.NOTIFY_CREATE_DEPLOYMENT_FAIL;
 import static com.microsoft.azure.toolkit.intellij.arm.action.CreateDeploymentAction.NOTIFY_CREATE_DEPLOYMENT_SUCCESS;
+import static com.microsoft.azuretools.telemetry.TelemetryConstants.BROWSE_TEMPLATE_SAMPLES;
 
 public class CreateDeploymentForm extends DeploymentBaseForm {
 
@@ -79,11 +67,11 @@ public class CreateDeploymentForm extends DeploymentBaseForm {
     private JRadioButton createNewRgButton;
     private JRadioButton useExistingRgButton;
     private JTextField deploymentNameTextField;
-    private JComboBox regionCb;
+    private com.microsoft.azure.toolkit.intellij.appservice.region.RegionComboBox regionCb;
     private JLabel usingExistRgRegionLabel;
     private JLabel usingExistRgRegionDetailLabel;
     private JLabel createNewRgRegionLabel;
-    private JComboBox subscriptionCb;
+    private com.microsoft.azure.toolkit.intellij.appservice.subscription.SubscriptionComboBox subscriptionCb;
     private TextFieldWithBrowseButton templateTextField;
     private HyperlinkLabel lblTemplateHover;
     private TextFieldWithBrowseButton parametersTextField;
@@ -108,13 +96,21 @@ public class CreateDeploymentForm extends DeploymentBaseForm {
 
         rgNameCb.addActionListener((l) -> {
             if (rgNameCb.getSelectedItem() != null) {
-                ResourceGroup rg = ((ElementWrapper<ResourceGroup>) rgNameCb.getSelectedItem()).getValue();
-                usingExistRgRegionDetailLabel.setText(rg.region().label());
+                ResourceGroup rg = (ResourceGroup) rgNameCb.getSelectedItem();
+                usingExistRgRegionDetailLabel.setText(Region.fromName(rg.getRegion()).getLabel());
             }
         });
         subscriptionCb.addActionListener((l) -> {
             fillResourceGroup();
-            fillRegion();
+        });
+
+        this.rgNameCb.setRenderer(new SimpleListCellRenderer<ResourceGroup>() {
+            @Override
+            public void customize(JList list, ResourceGroup rg, int i, boolean b, boolean b1) {
+                if (rg != null) {
+                    setText(rg.getName());
+                }
+            }
         });
 
         lblTemplateHover.setHyperlinkText("Browse for samples");
@@ -125,7 +121,6 @@ public class CreateDeploymentForm extends DeploymentBaseForm {
 
         initTemplateComponent();
         radioRgLogic();
-        initCache();
         fill();
         init();
     }
@@ -139,29 +134,30 @@ public class CreateDeploymentForm extends DeploymentBaseForm {
     @Override
     protected void doOKAction() {
         deploymentName = deploymentNameTextField.getText();
-        final String title = "Deploying your azure resource (" + deploymentName + ")...";
+        final IAzureOperationTitle title = AzureOperationBundle.title("arm|deployment.deploy", deploymentName);
         AzureTaskManager.getInstance().runInBackground(new AzureTask(project, title, false, () -> {
             EventUtil.executeWithLog(TelemetryConstants.ARM, TelemetryConstants.CREATE_DEPLOYMENT, (operation -> {
-                SubscriptionDetail subs = (SubscriptionDetail) subscriptionCb.getSelectedItem();
-                Azure azure = AuthMethodManager.getInstance().getAzureClient(subs.getSubscriptionId());
+                Subscription subs = (Subscription) subscriptionCb.getSelectedItem();
+                com.microsoft.azure.management.Azure azure = AuthMethodManager.getInstance().getAzureClient(subs.getId());
                 WithTemplate template;
                 if (createNewRgButton.isSelected()) {
                     rgName = rgNameTextFiled.getText();
+                    final Region region = (Region) regionCb.getSelectedItem();
                     template = azure
                         .deployments().define(deploymentName)
                         .withNewResourceGroup(rgNameTextFiled.getText(),
-                                              ((ElementWrapper<Region>) regionCb.getSelectedItem()).getValue());
+                            com.microsoft.azure.management.resources.fluentcore.arm.Region.fromName(region.getName()));
                 } else {
-                    ResourceGroup rg = ((ElementWrapper<ResourceGroup>) rgNameCb.getSelectedItem()).getValue();
+                    ResourceGroup rg = (ResourceGroup) rgNameCb.getSelectedItem();
                     List<ResourceEx<Deployment>> deployments = AzureMvpModel.getInstance()
-                                                                            .getDeploymentByRgName(subs.getSubscriptionId(), rg.name());
+                                                                            .getDeploymentByRgName(subs.getId(), rg.getName());
                     boolean isExist = deployments.parallelStream()
                                                  .anyMatch(deployment -> deployment.getResource().name().equals(deploymentName));
                     if (isExist) {
                         throw new RuntimeException(DUPLICATED_DEPLOYMENT_NAME);
                     }
-                    rgName = rg.name();
-                    template = azure.deployments().define(deploymentName).withExistingResourceGroup(rg);
+                    rgName = rg.getName();
+                    template = azure.deployments().define(deploymentName).withExistingResourceGroup(rg.getName());
                 }
 
                 String fileText = templateTextField.getText();
@@ -186,7 +182,7 @@ public class CreateDeploymentForm extends DeploymentBaseForm {
         close(DialogWrapper.OK_EXIT_CODE, true);
     }
 
-    public void filleSubsAndRg(ResourceManagementNode node) {
+    public void fillSubsAndRg(ResourceManagementNode node) {
         selectSubs(node.getSid());
         fillResourceGroup();
         UIUtils.selectByText(rgNameCb, node.getRgName());
@@ -202,48 +198,14 @@ public class CreateDeploymentForm extends DeploymentBaseForm {
                         FileChooserDescriptorFactory.createSingleLocalFileDescriptor()));
     }
 
+    private void createUIComponents() {
+        this.subscriptionCb = new SubscriptionComboBox();
+        this.regionCb = new RegionComboBox();
+    }
+
     private void fill() {
-        Map<SubscriptionDetail, List<ResourceGroup>> srgMap = AzureModel.
-            getInstance().getSubscriptionToResourceGroupMap();
-
-        for (SubscriptionDetail sd : srgMap.keySet()) {
-            subscriptionCb.addItem(sd);
-        }
-        if (subscriptionCb.getItemCount() > 0) {
-            subscriptionCb.setSelectedIndex(0);
-        }
-
         deploymentNameTextField.setText("deployment" + System.currentTimeMillis());
         rgNameTextFiled.setText("resouregroup" + System.currentTimeMillis());
-    }
-
-    private void initCache() {
-        Map<SubscriptionDetail, List<Location>> subscription2Location =
-                AzureModel.getInstance().getSubscriptionToLocationMap();
-        if (subscription2Location == null) {
-            AzureTaskManager.getInstance().runInModal(new AzureTask(project, "Loading Available Locations...", false, () -> {
-                try {
-                    AzureModelController.updateSubscriptionMaps(null);
-                } catch (Exception ex) {
-                    AzurePlugin.log("Error loading locations", ex);
-                }
-            }));
-        }
-    }
-
-    private void fillRegion() {
-        List<Location> locations = AzureModel.getInstance().getSubscriptionToLocationMap()
-            .get(subscriptionCb.getSelectedItem()).stream().sorted(Comparator.comparing(Location::displayName)).
-                collect(Collectors.toList());
-        regionCb.removeAllItems();
-        for (Location location : locations) {
-            Region region = location.region();
-            ElementWrapper<Region> item = new ElementWrapper<>(region.label(), region);
-            regionCb.addItem(item);
-            if (region == Region.EUROPE_WEST) {
-                regionCb.setSelectedItem(item);
-            }
-        }
     }
 
     private void updateUI() {
@@ -251,16 +213,13 @@ public class CreateDeploymentForm extends DeploymentBaseForm {
     }
 
     private void fillResourceGroup() {
-        Map<SubscriptionDetail, List<ResourceGroup>> srgMap = AzureModel
-            .getInstance().getSubscriptionToResourceGroupMap();
+        if (subscriptionCb.getSelectedItem() == null) {
+            return;
+        }
+        String sid = ((Subscription) subscriptionCb.getSelectedItem()).getId();
         rgNameCb.removeAllItems();
-        for (SubscriptionDetail sd : srgMap.keySet()) {
-            if (sd == subscriptionCb.getSelectedItem()) {
-                for (ResourceGroup rg : srgMap.get(sd)) {
-                    rgNameCb.addItem(new ElementWrapper<>(rg.name(), rg));
-                }
-                break;
-            }
+        for (ResourceEx<ResourceGroup> rg : AzureMvpModel.getInstance().getResourceGroups(sid)) {
+            rgNameCb.addItem(rg.getResource());
         }
     }
 
@@ -268,6 +227,7 @@ public class CreateDeploymentForm extends DeploymentBaseForm {
         boolean isCreateNewRg = createNewRgButton.isSelected();
         rgNameTextFiled.setVisible(isCreateNewRg);
         regionCb.setVisible(isCreateNewRg);
+        regionCb.setSubscription((Subscription) this.subscriptionCb.getSelectedItem());
         createNewRgRegionLabel.setVisible(isCreateNewRg);
 
         rgNameCb.setVisible(!isCreateNewRg);
@@ -277,8 +237,11 @@ public class CreateDeploymentForm extends DeploymentBaseForm {
     }
 
     private void selectSubs(String targetSid) {
+        if (subscriptionCb.getItemCount() == 0) {
+            subscriptionCb.setValue(Azure.az(AzureAccount.class).account().getSubscription(targetSid), true);
+        }
         for (int i = 0; i < subscriptionCb.getItemCount(); i++) {
-            if (((SubscriptionDetail) subscriptionCb.getItemAt(i)).getSubscriptionId().equals(targetSid)) {
+            if (subscriptionCb.getItemAt(i).getId().equals(targetSid)) {
                 subscriptionCb.setSelectedIndex(i);
                 break;
             }

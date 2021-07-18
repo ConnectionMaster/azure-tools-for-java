@@ -1,23 +1,6 @@
 /*
- * Copyright (c) Microsoft Corporation
- *
- * All rights reserved.
- *
- * MIT License
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
- * documentation files (the "Software"), to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and
- * to permit persons to whom the Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all copies or substantial portions of
- * the Software.
- *
- * THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
- * THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Licensed under the MIT License. See License.txt in the project root for license information.
  */
 
 package com.microsoft.intellij.serviceexplorer;
@@ -26,10 +9,16 @@ import com.google.common.collect.ImmutableList;
 import com.microsoft.azure.hdinsight.serverexplore.HDInsightRootModuleImpl;
 import com.microsoft.azure.hdinsight.serverexplore.action.AddNewClusterAction;
 import com.microsoft.azure.sqlbigdata.serverexplore.SqlBigDataClusterModule;
+import com.microsoft.azure.toolkit.intellij.connector.sql.ConnectToSQLAction;
 import com.microsoft.azure.toolkit.intellij.function.action.CreateFunctionAppAction;
 import com.microsoft.azure.toolkit.intellij.function.action.DeployFunctionAppAction;
 import com.microsoft.azure.toolkit.intellij.mysql.action.CreateMySQLAction;
-import com.microsoft.azure.toolkit.intellij.mysql.action.MySQLConnectToServerAction;
+import com.microsoft.azure.toolkit.intellij.mysql.action.OpenMySQLByToolsAction;
+import com.microsoft.azure.toolkit.intellij.connector.mysql.ConnectToMySQLAction;
+import com.microsoft.azure.toolkit.intellij.springcloud.creation.CreateSpringCloudAppAction;
+import com.microsoft.azure.toolkit.intellij.springcloud.deplolyment.DeploySpringCloudAppAction;
+import com.microsoft.azure.toolkit.intellij.sqlserver.CreateSqlServerAction;
+import com.microsoft.azure.toolkit.intellij.sqlserver.OpenSqlServerByToolsAction;
 import com.microsoft.azure.toolkit.intellij.webapp.action.CreateWebAppAction;
 import com.microsoft.azure.toolkit.intellij.webapp.action.DeployWebAppAction;
 import com.microsoft.azure.toolkit.intellij.appservice.action.ProfileFlightRecordAction;
@@ -43,7 +32,7 @@ import com.microsoft.azure.toolkit.intellij.arm.action.ExportTemplateAction;
 import com.microsoft.azure.toolkit.intellij.arm.action.UpdateDeploymentAction;
 import com.microsoft.azure.toolkit.intellij.webapp.docker.action.PushToContainerRegistryAction;
 import com.microsoft.azure.toolkit.intellij.redis.action.CreateRedisCacheAction;
-import com.microsoft.azure.toolkit.intellij.springcloud.action.SpringCloudStreamingLogsAction;
+import com.microsoft.azure.toolkit.intellij.springcloud.streaminglog.SpringCloudStreamingLogAction;
 import com.microsoft.intellij.serviceexplorer.azure.storage.ConfirmDialogAction;
 import com.microsoft.intellij.serviceexplorer.azure.storage.CreateQueueAction;
 import com.microsoft.intellij.serviceexplorer.azure.storage.CreateTableAction;
@@ -63,6 +52,9 @@ import com.microsoft.tooling.msservices.serviceexplorer.azure.mysql.MySQLModule;
 import com.microsoft.tooling.msservices.serviceexplorer.azure.mysql.MySQLNode;
 import com.microsoft.tooling.msservices.serviceexplorer.azure.rediscache.RedisCacheModule;
 import com.microsoft.tooling.msservices.serviceexplorer.azure.springcloud.SpringCloudAppNode;
+import com.microsoft.tooling.msservices.serviceexplorer.azure.springcloud.SpringCloudNode;
+import com.microsoft.tooling.msservices.serviceexplorer.azure.sqlserver.SqlServerModule;
+import com.microsoft.tooling.msservices.serviceexplorer.azure.sqlserver.SqlServerNode;
 import com.microsoft.tooling.msservices.serviceexplorer.azure.storage.ExternalStorageNode;
 import com.microsoft.tooling.msservices.serviceexplorer.azure.storage.QueueModule;
 import com.microsoft.tooling.msservices.serviceexplorer.azure.storage.StorageModule;
@@ -101,12 +93,13 @@ public class NodeActionsMap {
                 .add(PushToContainerRegistryAction.class).build());
         node2Actions.put(MySQLModule.class, new ImmutableList.Builder<Class<? extends NodeActionListener>>()
                 .add(CreateMySQLAction.class).build());
+        node2Actions.put(SqlServerModule.class, new ImmutableList.Builder<Class<? extends NodeActionListener>>()
+                .add(CreateSqlServerAction.class).build());
         // todo: what is ConfirmDialogAction?
         //noinspection unchecked
         node2Actions.put(ExternalStorageNode.class,
                 new ImmutableList.Builder<Class<? extends NodeActionListener>>()
                         .add(ConfirmDialogAction.class, ModifyExternalStorageAccountAction.class).build());
-        //noinspection unchecked
         node2Actions.put(HDInsightRootModuleImpl.class,
                 new ImmutableList.Builder<Class<? extends NodeActionListener>>()
                         .add(AddNewClusterAction.class).build());
@@ -114,9 +107,8 @@ public class NodeActionsMap {
                 new ImmutableList.Builder<Class<? extends NodeActionListener>>()
                         .add(LinkSqlServerBigDataClusterAction.class).build());
 
-        List<Class<? extends NodeActionListener>> deploymentNodeList = new ArrayList<>();
-        deploymentNodeList.addAll(Arrays.asList(ExportTemplateAction.class, ExportParameterAction.class,
-                UpdateDeploymentAction.class, EditDeploymentAction.class));
+        final List<Class<? extends NodeActionListener>> deploymentNodeList = new ArrayList<>(
+                Arrays.asList(ExportTemplateAction.class, ExportParameterAction.class, UpdateDeploymentAction.class, EditDeploymentAction.class));
 
         node2Actions.put(DeploymentNode.class, new ImmutableList.Builder<Class<? extends NodeActionListener>>()
             .addAll(deploymentNodeList).build());
@@ -127,14 +119,23 @@ public class NodeActionsMap {
         node2Actions.put(ResourceManagementNode.class, new ImmutableList.Builder<Class<? extends NodeActionListener>>()
             .add(CreateDeploymentAction.class).build());
 
+        node2Actions.put(SpringCloudNode.class, new ImmutableList.Builder<Class<? extends NodeActionListener>>()
+                .add(CreateSpringCloudAppAction.class)
+                .build());
+
         node2Actions.put(SpringCloudAppNode.class, new ImmutableList.Builder<Class<? extends NodeActionListener>>()
-                .add(SpringCloudStreamingLogsAction.class).build());
+                .add(SpringCloudStreamingLogAction.class)
+                .add(DeploySpringCloudAppAction.class)
+                .build());
 
         node2Actions.put(FunctionAppNode.class, new ImmutableList.Builder<Class<? extends NodeActionListener>>()
                 .add(StartStreamingLogsAction.class).add(StopStreamingLogsAction.class).add(DeployFunctionAppAction.class).build());
 
         node2Actions.put(MySQLNode.class, new ImmutableList.Builder<Class<? extends NodeActionListener>>()
-                .add(MySQLConnectToServerAction.class).build());
+                .add(OpenMySQLByToolsAction.class).add(ConnectToMySQLAction.class).build());
+
+        node2Actions.put(SqlServerNode.class, new ImmutableList.Builder<Class<? extends NodeActionListener>>()
+                .add(OpenSqlServerByToolsAction.class).add(ConnectToSQLAction.class).build());
 
         node2Actions.put(WebAppNode.class, new ImmutableList.Builder<Class<? extends NodeActionListener>>()
                 .add(StartStreamingLogsAction.class).add(StopStreamingLogsAction.class).add(SSHIntoWebAppAction.class)

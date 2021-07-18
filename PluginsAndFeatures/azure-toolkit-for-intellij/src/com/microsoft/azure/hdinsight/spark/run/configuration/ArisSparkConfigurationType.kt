@@ -24,18 +24,14 @@ package com.microsoft.azure.hdinsight.spark.run.configuration
 
 import com.intellij.execution.configurations.ConfigurationFactory
 import com.intellij.execution.configurations.ConfigurationType
-import com.intellij.execution.configurations.ConfigurationTypeUtil
-import com.microsoft.azure.hdinsight.common.CommonConst
-import com.microsoft.azure.hdinsight.common.IconPathBuilder
-import com.microsoft.intellij.util.PluginUtil
+import com.microsoft.intellij.helpers.AzureIconLoader
+import com.microsoft.tooling.msservices.serviceexplorer.AzureIconSymbol
 import javax.swing.Icon
 
 object ArisSparkConfigurationType : ConfigurationType {
     override fun getIcon(): Icon {
         // TODO: should use Aris config icon
-        return PluginUtil.getIcon(IconPathBuilder
-                .custom(CommonConst.OpenSparkUIIconName)
-                .build())
+        return AzureIconLoader.loadIcon(AzureIconSymbol.SQLServerBigDataCluster.MODULE)
     }
 
     override fun getDisplayName(): String {

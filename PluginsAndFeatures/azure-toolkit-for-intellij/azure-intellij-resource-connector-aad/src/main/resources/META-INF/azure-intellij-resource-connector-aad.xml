@@ -1,0 +1,3 @@
+<idea-plugin>
+  <resource-bundle>messages.aadBundle</resource-bundle>
+</idea-plugin>

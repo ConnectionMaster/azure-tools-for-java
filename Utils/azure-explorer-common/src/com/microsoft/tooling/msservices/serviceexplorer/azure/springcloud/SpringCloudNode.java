@@ -1,31 +1,14 @@
 /*
- * Copyright (c) Microsoft Corporation
- *
- * All rights reserved.
- *
- * MIT License
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
- * documentation files (the "Software"), to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and
- * to permit persons to whom the Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all copies or substantial portions of
- * the Software.
- *
- * THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
- * THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
- * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Licensed under the MIT License. See License.txt in the project root for license information.
  */
 
 package com.microsoft.tooling.msservices.serviceexplorer.azure.springcloud;
 
-import com.microsoft.azure.management.appplatform.v2020_07_01.DeploymentResource;
-import com.microsoft.azure.management.appplatform.v2020_07_01.implementation.AppResourceInner;
-import com.microsoft.azure.management.appplatform.v2020_07_01.implementation.DeploymentResourceInner;
-import com.microsoft.azure.management.appplatform.v2020_07_01.implementation.ServiceResourceInner;
+import com.microsoft.azure.toolkit.lib.common.event.AzureEventBus;
+import com.microsoft.azure.toolkit.lib.common.operation.AzureOperation;
+import com.microsoft.azure.toolkit.lib.springcloud.SpringCloudApp;
+import com.microsoft.azure.toolkit.lib.springcloud.SpringCloudCluster;
 import com.microsoft.azuretools.azurecommons.helpers.Nullable;
 import com.microsoft.azuretools.telemetry.AppInsightsConstants;
 import com.microsoft.azuretools.telemetry.TelemetryConstants;
@@ -36,65 +19,39 @@ import com.microsoft.tooling.msservices.serviceexplorer.AzureRefreshableNode;
 import com.microsoft.tooling.msservices.serviceexplorer.BasicActionBuilder;
 import com.microsoft.tooling.msservices.serviceexplorer.Node;
 import com.microsoft.tooling.msservices.serviceexplorer.RefreshableNode;
-import io.reactivex.rxjava3.disposables.Disposable;
+import lombok.Getter;
+import org.apache.commons.collections4.CollectionUtils;
 
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.logging.Logger;
-
-import static com.microsoft.tooling.msservices.serviceexplorer.azure.springcloud.SpringCloudModule.ICON_FILE;
 
 /**
  * SpringCloudNode
  */
-public class SpringCloudNode extends RefreshableNode implements TelemetryProperties, SpringCloudNodeView {
-    private static final Logger LOGGER = Logger.getLogger(SpringCloudNode.class.getName());
-    private static final String FAILED_TO_LOAD_APPS = "Failed to load apps in: %s";
-    private static final String ERROR_LOAD_APP = "Azure Services Explorer - Error Loading Spring Cloud Apps";
+public class SpringCloudNode extends RefreshableNode implements TelemetryProperties {
     private static final String EMPTY_POSTFIX = " (Empty)";
-    private static final String ACTION_OPEN_IN_PORTAL = "Open In Portal";
 
-    private final String subscriptionId;
-    private String clusterId;
-    private String clusterName;
-    private SpringCloudNodePresenter springCloudNodePresenter;
-    private Disposable rxSubscription;
+    @Getter
+    private final SpringCloudCluster cluster;
 
-    public SpringCloudNode(AzureRefreshableNode parent, String subscriptionId, ServiceResourceInner serviceInner) {
-        super(serviceInner.id(), serviceInner.name(), parent, ICON_FILE, true);
-
-        this.subscriptionId = subscriptionId;
-        this.clusterId = serviceInner.id();
-        this.clusterName = serviceInner.name();
-        springCloudNodePresenter = new SpringCloudNodePresenter<>();
-        springCloudNodePresenter.onAttachView(this);
+    public SpringCloudNode(AzureRefreshableNode parent, SpringCloudCluster cluster) {
+        super(cluster.id(), cluster.name(), parent, null, true);
+        this.cluster = cluster;
         loadActions();
+        AzureEventBus.after("springcloud|app.create", this::onAppCreatedOrRemoved);
+        AzureEventBus.after("springcloud|app.remove", this::onAppCreatedOrRemoved);
+    }
+
+    public void onAppCreatedOrRemoved(SpringCloudApp app) {
+        if (this.cluster.name().equals(app.getCluster().name())) {
+            this.load(true);
+        }
     }
 
     @Override
     public @Nullable AzureIconSymbol getIconSymbol() {
         return AzureIconSymbol.SpringCloud.CLUSTER;
-    }
-
-    private void notifyDataRefresh(SpringCloudAppEvent event) {
-        if (event.isDelete()) {
-            SpringCloudAppNode matchedNode =
-                    Arrays.stream(childNodes.toArray(new SpringCloudAppNode[0])).filter(node -> event.getId().equals(node.getAppId())).findFirst().orElse(null);
-            if (matchedNode != null) {
-                matchedNode.unsubscribe();
-                this.removeDirectChildNode(matchedNode);
-            }
-            if (this.childNodes.isEmpty()) {
-                this.setName(this.clusterName + EMPTY_POSTFIX);
-            }
-        } else {
-            if (Arrays.stream(childNodes.toArray(new SpringCloudAppNode[0])).noneMatch(node -> event.getId().equals(node.getAppId()))) {
-                addChildNode(new SpringCloudAppNode(event.getAppInner(), event.getDeploymentInner(), this));
-            }
-            this.setName(this.clusterName);
-        }
     }
 
     @Override
@@ -110,13 +67,16 @@ public class SpringCloudNode extends RefreshableNode implements TelemetryPropert
     }
 
     @Override
+    @AzureOperation(name = "springcloud|app.list.cluster", params = "this.cluster.name()", type = AzureOperation.Type.ACTION)
     protected void refreshItems() {
-        springCloudNodePresenter.onRefreshSpringCloudServiceNode(this.subscriptionId, this.clusterId);
+        final List<SpringCloudApp> apps = cluster.refresh().apps();
+        this.setName(CollectionUtils.isEmpty(apps) ? this.cluster.name() + EMPTY_POSTFIX : this.cluster.name());
+        apps.forEach(app -> addChildNode(new SpringCloudAppNode(app, this)));
     }
 
     @Override
     public void removeAllChildNodes() {
-        SpringCloudAppNode[] childNodes = getChildNodes().toArray(new SpringCloudAppNode[0]);
+        final SpringCloudAppNode[] childNodes = getChildNodes().toArray(new SpringCloudAppNode[0]);
         super.removeAllChildNodes();
         for (final SpringCloudAppNode child : childNodes) {
             child.unsubscribe();
@@ -124,14 +84,9 @@ public class SpringCloudNode extends RefreshableNode implements TelemetryPropert
     }
 
     @Override
-    public String getIconPath() {
-        return ICON_FILE;
-    }
-
-    @Override
     public Map<String, String> toProperties() {
         final Map<String, String> properties = new HashMap<>();
-        properties.put(AppInsightsConstants.SubscriptionId, this.subscriptionId);
+        properties.put(AppInsightsConstants.SubscriptionId, this.cluster.entity().getSubscriptionId());
         // todo: track region name
         return properties;
     }
@@ -143,49 +98,16 @@ public class SpringCloudNode extends RefreshableNode implements TelemetryPropert
     }
 
     @Override
-    public void renderSpringCloudApps(List<AppResourceInner> apps, Map<String, DeploymentResource> map) {
-        if (apps.isEmpty()) {
-            this.setName(this.clusterName + EMPTY_POSTFIX);
-        } else {
-            this.setName(this.clusterName);
-        }
-        for (AppResourceInner app : apps) {
-            DeploymentResource deploy = map.get(app.name());
-            DeploymentResourceInner deploymentResourceInner = deploy != null ? deploy.inner() : null;
-            SpringCloudStateManager.INSTANCE.notifySpringAppUpdate(this.clusterId, app, deploymentResourceInner);
-            addChildNode(new SpringCloudAppNode(app, deploymentResourceInner, this));
-        }
-        rxSubscription = SpringCloudStateManager.INSTANCE.subscribeSpringAppEvent(event -> {
-            notifyDataRefresh(event);
-        }, this.clusterId);
-    }
-
-    public String getClusterId() {
-        return clusterId;
-    }
-
-    public String getClusterName() {
-        return this.clusterName;
-    }
-
-    @Override
     public String getServiceName() {
         return TelemetryConstants.SPRING_CLOUD;
     }
 
-    @Override
-    public Object getProjectObject() {
-        return this.getProject();
-    }
-
     public void unsubscribe() {
-        if (rxSubscription != null && !rxSubscription.isDisposed()) {
-            rxSubscription.dispose();
-        }
+        // TODO: remove cluster event listeners
     }
 
     private void openInPortal() {
-        this.openResourcesInPortal(this.subscriptionId, this.clusterId);
+        this.openResourcesInPortal(this.cluster.entity().getSubscriptionId(), this.cluster.id());
     }
 
 }
